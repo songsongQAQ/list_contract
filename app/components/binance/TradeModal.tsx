@@ -18,12 +18,27 @@ interface TradeModalProps {
   isTrading: boolean;
   total: number;
   progress: number;
-  side?: 'LONG' | 'SHORT';
+  side?: 'LONG' | 'SHORT' | 'CLOSE_LONG' | 'CLOSE_SHORT' | 'CLOSE_ALL';
 }
 
 export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, results, isTrading, total, progress, side = 'LONG' }) => {
-  const sideText = side === 'LONG' ? '做多' : '做空';
-  const sideColor = side === 'LONG' ? 'text-green-600' : 'text-red-600';
+  const getSideText = () => {
+    switch (side) {
+      case 'LONG': return '做多';
+      case 'SHORT': return '做空';
+      case 'CLOSE_LONG': return '平多';
+      case 'CLOSE_SHORT': return '平空';
+      case 'CLOSE_ALL': return '全部平仓';
+      default: return '做多';
+    }
+  };
+  
+  const getSideColor = () => {
+    return 'text-red-600';
+  };
+  
+  const sideText = getSideText();
+  const sideColor = getSideColor();
   return (
     <AnimatePresence>
       {isOpen && (

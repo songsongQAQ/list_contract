@@ -171,7 +171,7 @@ export async function DELETE(request: NextRequest) {
           await client.createMarketOrder(p.symbol, orderSide, Math.abs(size), undefined, { 
             positionSide: side
           });
-          results.push({ symbol: p.symbol, status: 'CLOSED' });
+          results.push({ symbol: p.symbol, status: 'SUCCESS' });
         } catch (e: any) {
           results.push({ symbol: p.symbol, status: 'FAILED', message: e.message });
         }

@@ -77,7 +77,7 @@ export default function BinancePage() {
   const [tradeResults, setTradeResults] = useState<any[]>([]);
   const [tradeProgress, setTradeProgress] = useState(0);
   const [currentTradeTotal, setCurrentTradeTotal] = useState(0);
-  const [tradeSide, setTradeSide] = useState<'LONG' | 'SHORT'>('LONG');
+  const [tradeSide, setTradeSide] = useState<'LONG' | 'SHORT' | 'CLOSE_LONG' | 'CLOSE_SHORT' | 'CLOSE_ALL'>('LONG');
 
   // API Credentials State
   const [hasCredentials, setHasCredentials] = useState(true);
@@ -178,6 +178,15 @@ export default function BinancePage() {
       if (data.positions) {
         setPositions(data.positions);
         setWalletBalance(data.walletBalance || 0);
+        
+        // 当持仓有数据时，计算总盈亏并设置为网页标题
+        if (data.positions.length > 0) {
+          const totalPnl = data.positions.reduce((sum: number, pos: any) => sum + (pos.pnl || 0), 0);
+          const pnlText = totalPnl > 0 ? `+${totalPnl.toFixed(2)}` : totalPnl.toFixed(2);
+          document.title = pnlText;
+        } else {
+          document.title = '榜单合约系统';
+        }
       }
     } catch (error) {
       console.error('Failed to fetch positions', error);
@@ -268,14 +277,18 @@ export default function BinancePage() {
         .map(s => s.toUpperCase())
     );
     
-    // 过滤出不在忽略列表中的币种
+    // 获取已有持仓的币种集合
+    const openPositionsSet = new Set(positions.map(p => p.symbol));
+    
+    // 过滤出不在忽略列表中且没有持仓的币种
     let symbols = side === 'LONG' 
       ? marketData.topMarket.map(m => m.symbol)
       : marketData.topGainers.map(m => m.symbol);
     
     symbols = symbols.filter(symbol => {
       const cleanSymbol = symbol.replace('/USDT:USDT', '').replace('/USDT', '');
-      return !ignoredSet.has(cleanSymbol);
+      // 同时过滤出不在忽略列表且没有持仓的币种
+      return !ignoredSet.has(cleanSymbol) && !openPositionsSet.has(symbol);
     });
 
     const executeTrading = async () => {
@@ -349,22 +362,27 @@ export default function BinancePage() {
               console.error('  4. 账户余额是否充足');
             }
             
-            // 将错误信息添加到结果中显示
-            setTradeResults(prev => [...prev, { 
-              symbol: batch.join(','), 
-              status: 'FAILED', 
-              message: errorMsg 
-            }]);
+            // 为每个失败的币种创建单独的错误结果
+            batch.forEach(symbol => {
+              setTradeResults(prev => [...prev, { 
+                symbol, 
+                status: 'FAILED', 
+                message: errorMsg 
+              }]);
+            });
           } else {
             setTradeResults(prev => [...prev, ...(data.results || [])]);
           }
         } catch (e) {
           console.error(e);
-          setTradeResults(prev => [...prev, { 
-            symbol: batch.join(','), 
-            status: 'FAILED', 
-            message: e instanceof Error ? e.message : '网络错误' 
-          }]);
+          // 为每个币种创建单独的错误结果
+          batch.forEach(symbol => {
+            setTradeResults(prev => [...prev, { 
+              symbol, 
+              status: 'FAILED', 
+              message: e instanceof Error ? e.message : '网络错误' 
+            }]);
+          });
         }
 
         setTradeProgress(Math.min(i + batchSize, symbols.length));
@@ -387,12 +405,20 @@ export default function BinancePage() {
   const handleOpenPosition = async (symbol: string, side: 'LONG' | 'SHORT') => {
     const sideText = side === 'LONG' ? '做多' : '做空';
     
+    // 检查是否已有该币种的持仓
+    const hasExistingPosition = positions.some(p => p.symbol === symbol);
+    if (hasExistingPosition) {
+      setTradeResults([{ symbol, status: 'SKIPPED', message: '已有仓位' }]);
+      return;
+    }
+    
     const executeOpen = async () => {
       setIsTrading(true);
       setTradeModalOpen(true);
       setTradeResults([]);
       setTradeProgress(0);
       setCurrentTradeTotal(1);
+      setTradeSide(side);
 
       // 从 localStorage 读取交易设置
       const leverage = side === 'LONG'
@@ -459,6 +485,8 @@ export default function BinancePage() {
         } else {
           setTradeResults(data.results || []);
         }
+        
+        setTradeProgress(1);
       } catch (e) {
         console.error(e);
         setTradeResults([{ 
@@ -466,6 +494,7 @@ export default function BinancePage() {
           status: 'FAILED', 
           message: e instanceof Error ? e.message : '网络错误' 
         }]);
+        setTradeProgress(1);
       }
 
       setIsTrading(false);
@@ -490,7 +519,13 @@ export default function BinancePage() {
       setTradeModalOpen(true);
       setTradeResults([]);
       setTradeProgress(0);
-      setTradeSide(type === 'ALL' ? 'LONG' : type);
+      if (type === 'ALL') {
+        setTradeSide('CLOSE_ALL');
+      } else if (type === 'LONG') {
+        setTradeSide('CLOSE_LONG');
+      } else {
+        setTradeSide('CLOSE_SHORT');
+      }
       
       // 计算需要平仓的仓位
       const positionsToClose = positions.filter((p: any) => {
@@ -557,7 +592,7 @@ export default function BinancePage() {
             }
             
             setTradeResults(allResults);
-            setTradeProgress(allResults.length);
+            setTradeProgress(Math.min(i + batchSize, positionsToClose.length));
           } catch (e) {
             console.error('Batch close failed:', e);
             allResults.push({ 
@@ -566,6 +601,7 @@ export default function BinancePage() {
               message: e instanceof Error ? e.message : '网络错误' 
             });
             setTradeResults(allResults);
+            setTradeProgress(Math.min(i + batchSize, positionsToClose.length));
           }
         }
         
@@ -904,6 +940,8 @@ export default function BinancePage() {
                   type="loser"
                   icon={<TrendingDown className="w-5 h-5 text-orange-500" />}
                   color="pink"
+                  onAction={() => handleTrade('LONG')}
+                  actionLabel="一键做多"
                   isTrading={isTrading}
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}

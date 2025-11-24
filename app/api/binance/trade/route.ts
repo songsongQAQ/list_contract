@@ -79,8 +79,9 @@ export async function POST(request: NextRequest) {
 
     for (const symbol of symbols) {
       try {
+        // 检查该币种是否已有任何持仓
         if (existingPositions.has(symbol)) {
-          results.push({ symbol, status: 'FAILED', message: 'Position already exists, cannot open duplicate position' });
+          results.push({ symbol, status: 'SKIPPED', message: '已有仓位' });
           continue;
         }
 
