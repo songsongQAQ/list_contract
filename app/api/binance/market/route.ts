@@ -213,9 +213,24 @@ export async function GET(request: Request) {
         rank: t.rank,
       }));
 
+    const topLosers = [...mainZoneTickers]
+      .sort((a: any, b: any) => (a.percentage || 0) - (b.percentage || 0))
+      .slice(0, limit)
+      .map((t: any) => ({
+        symbol: t.symbol,
+        price: t.last,
+        change: t.percentage,
+        volume: t.quoteVolume,
+        volumeFormatted: formatVolume(t.quoteVolume || 0),
+        marketCap: t.marketCap,
+        marketCapFormatted: t.marketCapFormatted,
+        rank: t.rank,
+      }));
+
     return NextResponse.json({
       topMarket,
       topGainers,
+      topLosers,
     });
   } catch (error: any) {
     console.error('Error fetching market data:', error);

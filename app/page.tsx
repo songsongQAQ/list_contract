@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Settings, Activity, Layers, TrendingUp } from 'lucide-react';
+import { Settings, Activity, Layers, TrendingUp, TrendingDown } from 'lucide-react';
 import { MarketList } from './components/binance/MarketList';
 import { PositionsTable } from './components/binance/PositionsTable';
 import { TradeModal } from './components/binance/TradeModal';
@@ -12,7 +12,7 @@ import { ConfirmModal } from './components/binance/ConfirmModal';
 export default function BinancePage() {
   // 初始值始终为 10，避免 hydration 错误
   const [limit, setLimit] = useState(10);
-  const [marketData, setMarketData] = useState<{ topMarket: any[], topGainers: any[] }>({ topMarket: [], topGainers: [] });
+  const [marketData, setMarketData] = useState<{ topMarket: any[], topGainers: any[], topLosers: any[] }>({ topMarket: [], topGainers: [], topLosers: [] });
   const [positions, setPositions] = useState<any[]>([]);
   const [walletBalance, setWalletBalance] = useState(0);
 
@@ -37,7 +37,7 @@ export default function BinancePage() {
   
   
   // Mobile Tab State - 根据 UA 判断移动端，移动端默认显示持仓
-  const [activeTab, setActiveTab] = useState<'marketCap' | 'gainers' | 'positions'>('marketCap');
+  const [activeTab, setActiveTab] = useState<'marketCap' | 'gainers' | 'losers' | 'positions'>('marketCap');
   
   // 在客户端挂载后检测 UA 并更新 tab
   useEffect(() => {
@@ -480,7 +480,7 @@ export default function BinancePage() {
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tight text-gray-900">
-                Binance <span className="text-indigo-600">Pro</span>
+                榜单合约系统
               </h1>
               <p className="text-gray-400 font-medium text-xs">智能量化交易终端</p>
             </div>
@@ -543,7 +543,7 @@ export default function BinancePage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="hidden lg:flex items-center justify-center flex-1 flex-col gap-6"
-            style={{ height: 'calc(100vh - 200px)' }}
+            style={{ height: 'calc(100vh - 150px)' }}
           >
             <div className="text-center">
               <div className="text-6xl mb-4">🔑</div>
@@ -558,47 +558,61 @@ export default function BinancePage() {
             </div>
           </motion.div>
         ) : (
-          <div className="hidden lg:flex gap-6 overflow-x-auto" style={{ height: 'calc(100vh - 200px)' }}>
-            {/* Left Column: Positions & Stats */}
-            <div className="flex-shrink-0 w-[560px] overflow-hidden">
+          <div className="hidden lg:flex flex-col">
+            {/* Module 1: Positions & Stats - Full Screen (minus header) */}
+            <div className="w-full" style={{ height: 'calc(100vh - 150px)' }}>
               <PositionsTable positions={positions} onClose={handleClosePositions} loading={positionsLoading} walletBalance={walletBalance} hasCredentials={hasCredentials} />
             </div>
 
-            {/* Right Column: Market Data */}
-            <div className="flex-1 overflow-hidden flex flex-col min-w-0">
-              <div className="flex flex-col 2xl:flex-row gap-6 flex-1 overflow-y-auto 2xl:overflow-x-auto 2xl:overflow-y-hidden pb-2">
-                <div className="flex-1 lg:min-w-[560px] min-h-[400px] 2xl:min-h-0 overflow-hidden">
-                  <MarketList 
-                    title="市值 Top" 
-                    subtitle={`市值前 ${limit} 名`}
-                    data={marketData.topMarket} 
-                    type="market"
-                    icon={<Layers className="w-5 h-5 text-blue-500" />}
-                    color="blue"
-                    onAction={() => handleTrade('LONG')}
-                    actionLabel="一键做多"
-                    isTrading={isTrading}
-                    isLoading={marketLoading}
-                    openPositions={new Set(positions.map(p => p.symbol))}
-                    onOpenPosition={handleOpenPosition}
-                  />
-                </div>
-                <div className="flex-1 lg:min-w-[560px] min-h-[400px] 2xl:min-h-0 overflow-hidden">
-                  <MarketList 
-                    title="涨幅 Top" 
-                    subtitle={`24h 涨幅前 ${limit} 名`}
-                    data={marketData.topGainers} 
-                    type="gainer"
-                    icon={<Activity className="w-5 h-5 text-pink-500" />}
-                    color="pink"
-                    onAction={() => handleTrade('SHORT')}
-                    actionLabel="一键做空"
-                    isTrading={isTrading}
-                    isLoading={marketLoading}
-                    openPositions={new Set(positions.map(p => p.symbol))}
-                    onOpenPosition={handleOpenPosition}
-                  />
-                </div>
+            {/* Module 2: Market Data - 3 Columns - Full Screen (minus header) */}
+            <div className="w-full flex gap-6 p-6" style={{ height: 'calc(100vh - 100px)' }}>
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <MarketList 
+                  title="市值 Top" 
+                  subtitle={`市值前 ${limit} 名`}
+                  data={marketData.topMarket} 
+                  type="market"
+                  icon={<Layers className="w-5 h-5 text-blue-500" />}
+                  color="blue"
+                  onAction={() => handleTrade('LONG')}
+                  actionLabel="一键做多"
+                  isTrading={isTrading}
+                  isLoading={marketLoading}
+                  openPositions={new Set(positions.map(p => p.symbol))}
+                  onOpenPosition={handleOpenPosition}
+                />
+              </div>
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <MarketList 
+                  title="涨幅 Top" 
+                  subtitle={`24h 涨幅前 ${limit} 名`}
+                  data={marketData.topGainers} 
+                  type="gainer"
+                  icon={<Activity className="w-5 h-5 text-pink-500" />}
+                  color="pink"
+                  onAction={() => handleTrade('SHORT')}
+                  actionLabel="一键做空"
+                  isTrading={isTrading}
+                  isLoading={marketLoading}
+                  openPositions={new Set(positions.map(p => p.symbol))}
+                  onOpenPosition={handleOpenPosition}
+                />
+              </div>
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <MarketList 
+                  title="跌幅 Top" 
+                  subtitle={`24h 跌幅前 ${limit} 名`}
+                  data={marketData.topLosers} 
+                  type="loser"
+                  icon={<TrendingDown className="w-5 h-5 text-orange-500" />}
+                  color="pink"
+                  onAction={() => handleTrade('LONG')}
+                  actionLabel="一键做多"
+                  isTrading={isTrading}
+                  isLoading={marketLoading}
+                  openPositions={new Set(positions.map(p => p.symbol))}
+                  onOpenPosition={handleOpenPosition}
+                />
               </div>
             </div>
           </div>
@@ -630,7 +644,7 @@ export default function BinancePage() {
             <div className="flex bg-white border-b border-gray-200 sticky top-0 z-30 shrink-0 rounded-t-3xl">
             <button
               onClick={() => setActiveTab('positions')}
-              className={`flex-1 px-4 py-3 font-bold text-sm transition-all relative ${
+              className={`flex-1 px-2 py-3 font-bold text-xs transition-all relative ${
                 activeTab === 'positions'
                   ? 'text-indigo-600'
                   : 'text-gray-600 hover:text-gray-900'
@@ -643,27 +657,40 @@ export default function BinancePage() {
             </button>
             <button
               onClick={() => setActiveTab('marketCap')}
-              className={`flex-1 px-4 py-3 font-bold text-sm transition-all relative ${
+              className={`flex-1 px-2 py-3 font-bold text-xs transition-all relative ${
                 activeTab === 'marketCap'
                   ? 'text-indigo-600'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              市值Top
+              市值
               {activeTab === 'marketCap' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600" />
               )}
             </button>
             <button
               onClick={() => setActiveTab('gainers')}
-              className={`flex-1 px-4 py-3 font-bold text-sm transition-all relative ${
+              className={`flex-1 px-2 py-3 font-bold text-xs transition-all relative ${
                 activeTab === 'gainers'
                   ? 'text-indigo-600'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              涨幅Top
+              涨幅
               {activeTab === 'gainers' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('losers')}
+              className={`flex-1 px-2 py-3 font-bold text-xs transition-all relative ${
+                activeTab === 'losers'
+                  ? 'text-indigo-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              跌幅
+              {activeTab === 'losers' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600" />
               )}
             </button>
@@ -673,7 +700,7 @@ export default function BinancePage() {
           <div className="flex-1 overflow-hidden">
             {/* 市值Top Tab */}
             {activeTab === 'marketCap' && (
-              <div className="h-full w-full overflow-y-auto [&>div]:!rounded-none [&>div]:!border-0 [&>div]:!shadow-none [&>div>div:first-child]:!p-4 [&>div>div:last-child]:!p-2">
+              <div className="h-full w-full overflow-y-auto [&>div]:rounded-none! [&>div]:border-0! [&>div]:shadow-none! [&>div>div:first-child]:p-4! [&>div>div:last-child]:p-2!">
                 <MarketList 
                   title="市值 Top" 
                   subtitle={`市值前 ${limit} 名`}
@@ -693,7 +720,7 @@ export default function BinancePage() {
 
             {/* 涨幅Top Tab */}
             {activeTab === 'gainers' && (
-              <div className="h-full w-full overflow-y-auto [&>div]:!rounded-none [&>div]:!border-0 [&>div]:!shadow-none [&>div>div:first-child]:!p-4 [&>div>div:last-child]:!p-2">
+              <div className="h-full w-full overflow-y-auto [&>div]:rounded-none! [&>div]:border-0! [&>div]:shadow-none! [&>div>div:first-child]:p-4! [&>div>div:last-child]:p-2!">
                 <MarketList 
                   title="涨幅 Top" 
                   subtitle={`24h 涨幅前 ${limit} 名`}
@@ -703,6 +730,24 @@ export default function BinancePage() {
                   color="pink"
                   onAction={() => handleTrade('SHORT')}
                   actionLabel="一键做空"
+                  isTrading={isTrading}
+                  isLoading={marketLoading}
+                  openPositions={new Set(positions.map(p => p.symbol))}
+                  onOpenPosition={handleOpenPosition}
+                />
+              </div>
+            )}
+
+            {/* 跌幅Top Tab */}
+            {activeTab === 'losers' && (
+              <div className="h-full w-full overflow-y-auto [&>div]:rounded-none! [&>div]:border-0! [&>div]:shadow-none! [&>div>div:first-child]:p-4! [&>div>div:last-child]:p-2!">
+                <MarketList 
+                  title="跌幅 Top" 
+                  subtitle={`24h 跌幅前 ${limit} 名`}
+                  data={marketData.topLosers} 
+                  type="loser"
+                  icon={<TrendingDown className="w-5 h-5 text-orange-500" />}
+                  color="pink"
                   isTrading={isTrading}
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}

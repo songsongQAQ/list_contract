@@ -18,7 +18,7 @@ interface MarketListProps {
   title: string;
   subtitle: string;
   data: MarketItem[];
-  type: 'market' | 'gainer';
+  type: 'market' | 'gainer' | 'loser';
   icon: React.ReactNode;
   color: 'blue' | 'pink';
   onAction?: () => void;
@@ -43,11 +43,12 @@ export const MarketList: React.FC<MarketListProps> = ({
   openPositions = new Set(),
   onOpenPosition
 }) => {
-  const isLong = type === 'market';
-  const accentColor = isLong ? 'text-green-600' : 'text-red-600';
-  const bgColor = isLong ? 'bg-green-50' : 'bg-red-50';
-  const borderColor = isLong ? 'border-green-100' : 'border-red-100';
-  const buttonColor = isLong ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700';
+  const isLong = type === 'market' || type === 'loser';
+  const isLoser = type === 'loser';
+  const accentColor = isLong ? 'text-green-600' : isLoser ? 'text-orange-600' : 'text-red-600';
+  const bgColor = isLong ? 'bg-green-50' : isLoser ? 'bg-orange-50' : 'bg-red-50';
+  const borderColor = isLong ? 'border-green-100' : isLoser ? 'border-orange-100' : 'border-red-100';
+  const buttonColor = isLong ? 'bg-green-600 hover:bg-green-700' : isLoser ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700';
 
   // 格式化价格：最多展示四位小数，去掉末尾的0
   const formatPrice = (price: number) => {
@@ -74,8 +75,16 @@ export const MarketList: React.FC<MarketListProps> = ({
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full lg:min-w-[560px]"
+      className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full relative"
     >
+      {isLoading && (
+        <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center z-20 rounded-3xl">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
+            <span className="text-sm font-bold text-gray-600">加载中...</span>
+          </div>
+        </div>
+      )}
       <div className={`p-6 border-b ${borderColor} ${bgColor} backdrop-blur-sm sticky top-0 z-10 flex justify-between items-start`}>
         <div>
           <div className="flex items-center gap-3 mb-1">
@@ -99,15 +108,7 @@ export const MarketList: React.FC<MarketListProps> = ({
         )}
       </div>
 
-      <div className="overflow-y-auto p-3 md:p-4 space-y-2 md:space-y-3 flex-1 custom-scrollbar relative">
-        {isLoading && (
-          <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center z-10 rounded-b-3xl">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
-              <span className="text-sm font-bold text-gray-600">加载中...</span>
-            </div>
-          </div>
-        )}
+      <div className="overflow-y-auto p-3 md:p-4 space-y-2 md:space-y-3 flex-1 custom-scrollbar">
         {data.map((item, index) => {
           const isOpen = openPositions.has(item.symbol);
           return (
@@ -128,7 +129,7 @@ export const MarketList: React.FC<MarketListProps> = ({
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-bold text-sm text-gray-900 truncate">
-                        {item.symbol.replace(/\/USDT|:USDT|USDT/, '')}
+                        {item.symbol.replace(/\/USDT:USDT|\/USDT|:USDT/, '')}
                       </h3>
                       <div className="text-xs text-gray-500 font-medium mt-0.5">
                         ${formatPrice(parseFloat(item.price.toString()))}
@@ -179,8 +180,8 @@ export const MarketList: React.FC<MarketListProps> = ({
                   </div>
                   <div className="flex-1">
                     <h3 className="font-bold text-gray-900">
-                      {item.symbol.replace(/\/USDT|:USDT|USDT/, '')}
-                      {item.rank && <span className="ml-2 text-xs text-gray-400">#{item.rank}</span>}
+                      {item.symbol.replace(/\/USDT:USDT|\/USDT|:USDT/, '')}
+                      {type === 'market' && item.rank && <span className="ml-2 text-xs text-gray-400">#{item.rank}</span>}
                     </h3>
                     <div className="flex items-center gap-2 text-xs text-gray-400 font-medium mt-0.5">
                       <span className="flex items-center">

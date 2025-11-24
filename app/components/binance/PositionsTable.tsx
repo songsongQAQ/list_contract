@@ -70,7 +70,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
     <motion.div 
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-xl shadow-indigo-100/50 border border-white/60 overflow-hidden flex flex-col h-full lg:min-w-[560px]"
+      className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-xl shadow-indigo-100/50 border border-white/60 overflow-hidden flex flex-col h-full w-full"
     >
       {/* Header & Stats */}
       <div className="p-3 md:p-6 border-b border-gray-200 space-y-3 md:space-y-6">
@@ -188,7 +188,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2 mb-1.5">
                           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${p.side === 'LONG' ? 'bg-green-500' : 'bg-red-500'}`} />
-                          <span className="font-bold text-gray-900 text-sm whitespace-nowrap">{p.symbol.replace('/USDT:USDT', '')}</span>
+                          <span className="font-bold text-gray-900 text-sm whitespace-nowrap">{p.symbol.replace(/\/USDT:USDT|\/USDT|:USDT/, '')}</span>
                         </div>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap ${p.side === 'LONG' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
@@ -261,7 +261,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                     <div className="flex items-start gap-2">
                       <span className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${p.side === 'LONG' ? 'bg-green-500' : 'bg-red-500'}`} />
                       <div>
-                        <h3 className="font-bold text-sm text-gray-900">{p.symbol.replace('/USDT:USDT', '')}</h3>
+                        <h3 className="font-bold text-sm text-gray-900">{p.symbol.replace(/\/USDT:USDT|\/USDT|:USDT/, '')}</h3>
                         <div className="flex items-center gap-1.5 mt-1">
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${p.side === 'LONG' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                             {p.side === 'LONG' ? '做多' : '做空'}
