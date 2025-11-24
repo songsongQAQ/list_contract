@@ -239,16 +239,16 @@ export default function BinancePage() {
         ? parseFloat(localStorage.getItem('trading_long_leverage') || '50')
         : parseFloat(localStorage.getItem('trading_short_leverage') || '50');
       
-      const notional = side === 'LONG'
-        ? parseFloat(localStorage.getItem('trading_long_amount') || '150')
-        : parseFloat(localStorage.getItem('trading_short_amount') || '150');
+      const margin = side === 'LONG'
+        ? parseFloat(localStorage.getItem('trading_long_margin') || '3')
+        : parseFloat(localStorage.getItem('trading_short_margin') || '3');
+      
+      // 计算仓位价值 = 本金 × 杠杆倍数
+      const notional = margin * leverage;
       
       // 从 localStorage 读取止盈止损设置（相对于本金的倍数）
       const takeProfitMultiple = parseFloat(localStorage.getItem('take_profit_percent') || '0');
       const stopLossMultiple = parseFloat(localStorage.getItem('stop_loss_percent') || '0');
-      
-      // 计算本金
-      const margin = notional / leverage;
       
       // 转换为相对于仓位价值的百分比
       // 止盈/止损金额 = 本金 × (倍数 / 100)
@@ -316,16 +316,16 @@ export default function BinancePage() {
         ? parseFloat(localStorage.getItem('trading_long_leverage') || '50')
         : parseFloat(localStorage.getItem('trading_short_leverage') || '50');
       
-      const notional = side === 'LONG'
-        ? parseFloat(localStorage.getItem('trading_long_amount') || '150')
-        : parseFloat(localStorage.getItem('trading_short_amount') || '150');
+      const margin = side === 'LONG'
+        ? parseFloat(localStorage.getItem('trading_long_margin') || '3')
+        : parseFloat(localStorage.getItem('trading_short_margin') || '3');
+      
+      // 计算仓位价值 = 本金 × 杠杆倍数
+      const notional = margin * leverage;
       
       // 从 localStorage 读取止盈止损设置（相对于本金的倍数）
       const takeProfitMultiple = parseFloat(localStorage.getItem('take_profit_percent') || '0');
       const stopLossMultiple = parseFloat(localStorage.getItem('stop_loss_percent') || '0');
-      
-      // 计算本金
-      const margin = notional / leverage;
       
       // 转换为相对于仓位价值的百分比
       // 止盈/止损金额 = 本金 × (倍数 / 100)

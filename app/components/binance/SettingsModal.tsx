@@ -12,17 +12,18 @@ interface SettingsModalProps {
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [saving, setSaving] = useState(false);
   
+  // 交易设置状态
   const [settings, setSettings] = useState({
-    apiKey: '',
-    apiSecret: '',
-    longLeverage: '50',
-    longAmount: '150',
-    shortLeverage: '50',
-    shortAmount: '150',
-    defaultLimit: '10',
-    ignoredSymbols: '',
-    takeProfit: '',
-    stopLoss: '',
+    apiKey: '', // Binance API 密钥
+    apiSecret: '', // Binance API 秘钥
+    longLeverage: '50', // 做多杠杆倍数（默认50x）
+    longMargin: '3', // 做多本金（USDT，默认3）
+    shortLeverage: '50', // 做空杠杆倍数（默认50x）
+    shortMargin: '3', // 做空本金（USDT，默认3）
+    defaultLimit: '10', // 排行榜默认显示数量
+    ignoredSymbols: '', // 忽略的币种列表（空格分隔）
+    takeProfit: '', // 止盈百分比（相对于本金）
+    stopLoss: '', // 止损百分比（相对于本金）
   });
 
   useEffect(() => {
@@ -37,9 +38,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       apiKey: localStorage.getItem('binance_api_key') || '',
       apiSecret: localStorage.getItem('binance_api_secret') || '',
       longLeverage: localStorage.getItem('trading_long_leverage') || '50',
-      longAmount: localStorage.getItem('trading_long_amount') || '150',
+      longMargin: localStorage.getItem('trading_long_margin') || '3',
       shortLeverage: localStorage.getItem('trading_short_leverage') || '50',
-      shortAmount: localStorage.getItem('trading_short_amount') || '150',
+      shortMargin: localStorage.getItem('trading_short_margin') || '3',
       defaultLimit: localStorage.getItem('default_limit') || '10',
       ignoredSymbols: localStorage.getItem('ignored_symbols') || '',
       takeProfit: localStorage.getItem('take_profit_percent') || '',
@@ -61,9 +62,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       localStorage.setItem('binance_api_key', settings.apiKey.trim());
       localStorage.setItem('binance_api_secret', settings.apiSecret.trim());
       localStorage.setItem('trading_long_leverage', settings.longLeverage);
-      localStorage.setItem('trading_long_amount', settings.longAmount);
+      localStorage.setItem('trading_long_margin', settings.longMargin);
       localStorage.setItem('trading_short_leverage', settings.shortLeverage);
-      localStorage.setItem('trading_short_amount', settings.shortAmount);
+      localStorage.setItem('trading_short_margin', settings.shortMargin);
       localStorage.setItem('default_limit', settings.defaultLimit);
       localStorage.setItem('ignored_symbols', settings.ignoredSymbols.trim());
       localStorage.setItem('take_profit_percent', settings.takeProfit);
@@ -192,13 +193,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                       <h3 className="text-sm font-bold text-blue-600 uppercase tracking-wider">做多设置 (Long)</h3>
                       <div className="bg-blue-50 rounded-lg px-3 py-1 border border-blue-200">
                         <p className="text-xs text-blue-700 font-bold">
-                          💰 本金: <span className="text-blue-900">${
-                            (parseFloat(settings.longAmount || '0') / parseFloat(settings.longLeverage || '1')).toFixed(2)
+                          💰 仓位价值: <span className="text-blue-900">${
+                            (parseFloat(settings.longMargin || '0') * parseFloat(settings.longLeverage || '1')).toFixed(2)
                           }</span>
                         </p>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-500">本金 (USDT)</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            value={settings.longMargin}
+                            onChange={(e) => setSettings(prev => ({ ...prev, longMargin: e.target.value }))}
+                            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-900"
+                          />
+                          <span className="absolute right-4 top-2 text-gray-400 text-sm font-bold">$</span>
+                        </div>
+                      </div>
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-500">杠杆倍数</label>
                         <div className="relative">
@@ -209,18 +222,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                             className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-900"
                           />
                           <span className="absolute right-4 top-2 text-gray-400 text-sm font-bold">x</span>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-500">仓位价值 (USDT)</label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            value={settings.longAmount}
-                            onChange={(e) => setSettings(prev => ({ ...prev, longAmount: e.target.value }))}
-                            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-900"
-                          />
-                          <span className="absolute right-4 top-2 text-gray-400 text-sm font-bold">$</span>
                         </div>
                     </div>
                   </div>
@@ -234,13 +235,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                       <h3 className="text-sm font-bold text-pink-600 uppercase tracking-wider">做空设置 (Short)</h3>
                       <div className="bg-pink-50 rounded-lg px-3 py-1 border border-pink-200">
                         <p className="text-xs text-pink-700 font-bold">
-                          💰 本金: <span className="text-pink-900">${
-                            (parseFloat(settings.shortAmount || '0') / parseFloat(settings.shortLeverage || '1')).toFixed(2)
+                          💰 仓位价值: <span className="text-pink-900">${
+                            (parseFloat(settings.shortMargin || '0') * parseFloat(settings.shortLeverage || '1')).toFixed(2)
                           }</span>
                         </p>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-500">本金 (USDT)</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            value={settings.shortMargin}
+                            onChange={(e) => setSettings(prev => ({ ...prev, shortMargin: e.target.value }))}
+                            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 font-bold text-gray-900"
+                          />
+                          <span className="absolute right-4 top-2 text-gray-400 text-sm font-bold">$</span>
+                        </div>
+                      </div>
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-500">杠杆倍数</label>
                         <div className="relative">
@@ -251,18 +264,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                             className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 font-bold text-gray-900"
                           />
                           <span className="absolute right-4 top-2 text-gray-400 text-sm font-bold">x</span>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-500">仓位价值 (USDT)</label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            value={settings.shortAmount}
-                            onChange={(e) => setSettings(prev => ({ ...prev, shortAmount: e.target.value }))}
-                            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 font-bold text-gray-900"
-                          />
-                          <span className="absolute right-4 top-2 text-gray-400 text-sm font-bold">$</span>
                         </div>
                     </div>
                   </div>
