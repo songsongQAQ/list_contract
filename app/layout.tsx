@@ -25,8 +25,8 @@ const vt323 = VT323({
 });
 
 export const metadata: Metadata = {
-  title: "Binance 期货交易终端",
-  description: "币安期货交易终端，支持做多/做空操作，实时市场数据和持仓管理",
+  title: "榜单合约系统",
+  description: "基于 Binance 期货的榜单交易系统，支持市值榜单和涨幅榜单交易，实时市场数据和持仓管理",
 };
 
 export default function RootLayout({
