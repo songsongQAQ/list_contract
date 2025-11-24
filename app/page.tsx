@@ -1,0 +1,776 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Settings, Activity, Layers, TrendingUp } from 'lucide-react';
+import { MarketList } from './components/binance/MarketList';
+import { PositionsTable } from './components/binance/PositionsTable';
+import { TradeModal } from './components/binance/TradeModal';
+import { SettingsModal } from './components/binance/SettingsModal';
+import { ConfirmModal } from './components/binance/ConfirmModal';
+
+export default function BinancePage() {
+  // 初始值始终为 10，避免 hydration 错误
+  const [limit, setLimit] = useState(10);
+  const [marketData, setMarketData] = useState<{ topMarket: any[], topGainers: any[] }>({ topMarket: [], topGainers: [] });
+  const [positions, setPositions] = useState<any[]>([]);
+  const [walletBalance, setWalletBalance] = useState(0);
+
+  // 处理 limit 变化并同步到 localStorage
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit);
+    localStorage.setItem('default_limit', String(newLimit));
+    console.log(`✓ Top 设置已更新为: ${newLimit}`);
+  };
+
+  // 在客户端挂载后从 localStorage 读取 limit
+  useEffect(() => {
+    const saved = localStorage.getItem('default_limit');
+    if (saved) {
+      setLimit(parseInt(saved));
+    }
+  }, []);
+  
+  // Loading States for Lists
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [positionsLoading, setPositionsLoading] = useState(false);
+  
+  
+  // Mobile Tab State - 根据 UA 判断移动端，移动端默认显示持仓
+  const [activeTab, setActiveTab] = useState<'marketCap' | 'gainers' | 'positions'>('marketCap');
+  
+  // 在客户端挂载后检测 UA 并更新 tab
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    if (isMobileDevice) {
+      setActiveTab('positions');
+    }
+  }, []);
+  
+  // Settings State
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  
+  // Confirm Modal State
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmData, setConfirmData] = useState<{
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm: () => void;
+    isDangerous?: boolean;
+  }>({
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+  
+  // Trading State
+  const [isTrading, setIsTrading] = useState(false);
+  const [tradeModalOpen, setTradeModalOpen] = useState(false);
+  const [tradeResults, setTradeResults] = useState<any[]>([]);
+  const [tradeProgress, setTradeProgress] = useState(0);
+  const [currentTradeTotal, setCurrentTradeTotal] = useState(0);
+  const [tradeSide, setTradeSide] = useState<'LONG' | 'SHORT'>('LONG');
+
+  // API Credentials State
+  const [hasCredentials, setHasCredentials] = useState(true);
+
+  const fetchMarketData = async () => {
+    setMarketLoading(true);
+    try {
+      const apiKey = localStorage.getItem('binance_api_key')?.trim();
+      const apiSecret = localStorage.getItem('binance_api_secret')?.trim();
+      
+      // 只有在有有效凭证时才添加 headers
+      const headers: Record<string, string> = {};
+      if (apiKey && apiSecret) {
+        headers['x-api-key'] = apiKey;
+        headers['x-api-secret'] = apiSecret;
+      }
+      
+      const res = await fetch(`/api/binance/market?limit=${limit}`, {
+        headers,
+      });
+      const data = await res.json();
+      if (data.topMarket) {
+        setMarketData(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch market data', error);
+    } finally {
+      setMarketLoading(false);
+    }
+  };
+
+  const fetchPositions = async () => {
+    setPositionsLoading(true);
+    try {
+      const apiKey = localStorage.getItem('binance_api_key')?.trim();
+      const apiSecret = localStorage.getItem('binance_api_secret')?.trim();
+
+      // 如果没有有效凭证，直接返回
+      if (!apiKey || !apiSecret) {
+        console.log('No valid credentials for fetching positions');
+        setPositions([]);
+        setWalletBalance(0);
+        setPositionsLoading(false);
+        return;
+      }
+
+      const res = await fetch('/api/binance/positions', {
+        headers: {
+          'x-api-key': apiKey,
+          'x-api-secret': apiSecret,
+        },
+      });
+      const data = await res.json();
+      if (data.positions) {
+        setPositions(data.positions);
+        setWalletBalance(data.walletBalance || 0);
+      }
+    } catch (error) {
+      console.error('Failed to fetch positions', error);
+    } finally {
+      setPositionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // 检查是否有 API 密钥
+    const checkCredentials = () => {
+      const apiKey = localStorage.getItem('binance_api_key');
+      const apiSecret = localStorage.getItem('binance_api_secret');
+      const hasKey = !!(apiKey && apiSecret && apiKey.trim() && apiSecret.trim());
+      setHasCredentials(hasKey);
+      return hasKey;
+    };
+
+    // 检查凭证并加载数据
+    const credentialsExist = checkCredentials();
+
+    // 仅在有凭证时才加载数据
+    if (credentialsExist) {
+      fetchMarketData();
+      fetchPositions();
+    }
+    
+    // 简单的同步检查函数用于定时器
+    const checkCredentialsSync = (): boolean => {
+      const apiKey = localStorage.getItem('binance_api_key');
+      const apiSecret = localStorage.getItem('binance_api_secret');
+      return !!(apiKey && apiSecret && apiKey.trim() && apiSecret.trim());
+    };
+    
+    let marketInterval: NodeJS.Timeout;
+    let positionsInterval: NodeJS.Timeout;
+    
+    // 启动定时刷新
+    if (credentialsExist) {
+      // 市场数据每60秒刷新一次
+      marketInterval = setInterval(() => {
+        if (checkCredentialsSync()) {
+          console.log(`[${new Date().toLocaleTimeString()}] 自动刷新市场数据`);
+          fetchMarketData();
+        }
+      }, 60000);
+      
+      // 持仓每10秒刷新一次
+      positionsInterval = setInterval(() => {
+        if (checkCredentialsSync()) {
+          console.log(`[${new Date().toLocaleTimeString()}] 自动刷新持仓数据`);
+          fetchPositions();
+        }
+      }, 10000);
+    }
+    
+    // 监听设置变化事件
+    const handleSettingsChanged = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail && customEvent.detail.defaultLimit) {
+        setLimit(parseInt(customEvent.detail.defaultLimit));
+      }
+      // 页面重新加载会自动检查凭证
+    };
+
+    window.addEventListener('settingsChanged', handleSettingsChanged);
+    
+    return () => {
+      clearInterval(marketInterval);
+      clearInterval(positionsInterval);
+      window.removeEventListener('settingsChanged', handleSettingsChanged);
+    };
+  }, [limit]);
+
+  const handleTrade = async (side: 'LONG' | 'SHORT') => {
+    const sideText = side === 'LONG' ? '做多' : '做空';
+    const targetList = side === 'LONG' ? '市值前' : '涨幅前';
+    
+    // 获取忽略的币种列表
+    const ignoredSymbolsStr = localStorage.getItem('ignored_symbols') || '';
+    const ignoredSet = new Set(
+      ignoredSymbolsStr
+        .split(/\s+/)
+        .filter(s => s.length > 0)
+        .map(s => s.toUpperCase())
+    );
+    
+    // 过滤出不在忽略列表中的币种
+    let symbols = side === 'LONG' 
+      ? marketData.topMarket.map(m => m.symbol)
+      : marketData.topGainers.map(m => m.symbol);
+    
+    symbols = symbols.filter(symbol => {
+      const cleanSymbol = symbol.replace('/USDT:USDT', '').replace('/USDT', '');
+      return !ignoredSet.has(cleanSymbol);
+    });
+
+    const executeTrading = async () => {
+      setIsTrading(true);
+      setTradeModalOpen(true);
+      setTradeResults([]);
+      setTradeProgress(0);
+      setCurrentTradeTotal(symbols.length);
+      setTradeSide(side);
+
+      // 从 localStorage 读取交易设置
+      const leverage = side === 'LONG'
+        ? parseFloat(localStorage.getItem('trading_long_leverage') || '50')
+        : parseFloat(localStorage.getItem('trading_short_leverage') || '50');
+      
+      const notional = side === 'LONG'
+        ? parseFloat(localStorage.getItem('trading_long_amount') || '150')
+        : parseFloat(localStorage.getItem('trading_short_amount') || '150');
+      
+      // 从 localStorage 读取止盈止损设置（相对于本金的倍数）
+      const takeProfitMultiple = parseFloat(localStorage.getItem('take_profit_percent') || '0');
+      const stopLossMultiple = parseFloat(localStorage.getItem('stop_loss_percent') || '0');
+      
+      // 计算本金
+      const margin = notional / leverage;
+      
+      // 转换为相对于仓位价值的百分比
+      // 止盈/止损金额 = 本金 × (倍数 / 100)
+      // 百分比 = 金额 / 仓位价值 × 100
+      const takeProfitPercent = takeProfitMultiple > 0 ? (margin * takeProfitMultiple / 100) / notional * 100 : 0;
+      const stopLossPercent = stopLossMultiple > 0 ? (margin * stopLossMultiple / 100) / notional * 100 : 0;
+
+      const batchSize = 5;
+      for (let i = 0; i < symbols.length; i += batchSize) {
+        const batch = symbols.slice(i, i + batchSize);
+        
+        try {
+          const apiKey = localStorage.getItem('binance_api_key')?.trim();
+          const apiSecret = localStorage.getItem('binance_api_secret')?.trim();
+
+          if (!apiKey || !apiSecret) {
+            console.error('No valid credentials for trading');
+            continue;
+          }
+
+          const res = await fetch('/api/binance/trade', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+              'x-api-secret': apiSecret,
+            },
+            body: JSON.stringify({ symbols: batch, side, leverage, notional, takeProfitPercent, stopLossPercent })
+          });
+          const data = await res.json();
+          setTradeResults(prev => [...prev, ...(data.results || [])]);
+        } catch (e) {
+          console.error(e);
+        }
+
+        setTradeProgress(Math.min(i + batchSize, symbols.length));
+      }
+
+      setIsTrading(false);
+      fetchPositions();
+    };
+
+    setConfirmData({
+      title: '确认交易',
+      message: `确定要一键${sideText}吗？\n\n目标：${targetList} ${limit} 名\n\n这将对目前没有持仓的币种进行开单。`,
+      confirmText: '确定',
+      cancelText: '取消',
+      onConfirm: executeTrading,
+    });
+    setConfirmOpen(true);
+  };
+
+  const handleOpenPosition = async (symbol: string, side: 'LONG' | 'SHORT') => {
+    const sideText = side === 'LONG' ? '做多' : '做空';
+    
+    const executeOpen = async () => {
+      setIsTrading(true);
+      setTradeModalOpen(true);
+      setTradeResults([]);
+      setTradeProgress(0);
+      setCurrentTradeTotal(1);
+
+      // 从 localStorage 读取交易设置
+      const leverage = side === 'LONG'
+        ? parseFloat(localStorage.getItem('trading_long_leverage') || '50')
+        : parseFloat(localStorage.getItem('trading_short_leverage') || '50');
+      
+      const notional = side === 'LONG'
+        ? parseFloat(localStorage.getItem('trading_long_amount') || '150')
+        : parseFloat(localStorage.getItem('trading_short_amount') || '150');
+      
+      // 从 localStorage 读取止盈止损设置（相对于本金的倍数）
+      const takeProfitMultiple = parseFloat(localStorage.getItem('take_profit_percent') || '0');
+      const stopLossMultiple = parseFloat(localStorage.getItem('stop_loss_percent') || '0');
+      
+      // 计算本金
+      const margin = notional / leverage;
+      
+      // 转换为相对于仓位价值的百分比
+      // 止盈/止损金额 = 本金 × (倍数 / 100)
+      // 百分比 = 金额 / 仓位价值 × 100
+      const takeProfitPercent = takeProfitMultiple > 0 ? (margin * takeProfitMultiple / 100) / notional * 100 : 0;
+      const stopLossPercent = stopLossMultiple > 0 ? (margin * stopLossMultiple / 100) / notional * 100 : 0;
+
+      try {
+        const apiKey = localStorage.getItem('binance_api_key')?.trim();
+        const apiSecret = localStorage.getItem('binance_api_secret')?.trim();
+
+        if (!apiKey || !apiSecret) {
+          console.error('No valid credentials for trading');
+          setTradeResults([{ symbol, status: 'FAILED', message: 'No valid API credentials' }]);
+          setIsTrading(false);
+          return;
+        }
+
+        const res = await fetch('/api/binance/trade', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'x-api-secret': apiSecret,
+          },
+          body: JSON.stringify({ symbols: [symbol], side, leverage, notional, takeProfitPercent, stopLossPercent })
+        });
+        const data = await res.json();
+        setTradeResults(data.results || []);
+      } catch (e) {
+        console.error(e);
+      }
+
+      setIsTrading(false);
+      fetchPositions();
+    };
+
+    setConfirmData({
+      title: '确认开仓',
+      message: `确定要对 ${symbol} 进行 ${sideText} 开仓吗？`,
+      confirmText: '确定',
+      cancelText: '取消',
+      onConfirm: executeOpen,
+    });
+    setConfirmOpen(true);
+  };
+
+  const handleClosePositions = async (type: 'LONG' | 'SHORT' | 'ALL') => {
+    const typeText = type === 'LONG' ? '多单' : type === 'SHORT' ? '空单' : '所有持仓';
+    
+    const executeClose = async () => {
+      setIsTrading(true);
+      setTradeModalOpen(true);
+      setTradeResults([]);
+      setTradeProgress(0);
+      setTradeSide(type === 'ALL' ? 'LONG' : type);
+      
+      // 计算需要平仓的仓位
+      const positionsToClose = positions.filter((p: any) => {
+        if (type === 'ALL') return true;
+        const side = parseFloat(p.size) > 0 ? 'LONG' : 'SHORT';
+        return type === side;
+      });
+      setCurrentTradeTotal(positionsToClose.length);
+
+      try {
+        const apiKey = localStorage.getItem('binance_api_key')?.trim();
+        const apiSecret = localStorage.getItem('binance_api_secret')?.trim();
+
+        if (!apiKey || !apiSecret) {
+          console.error('No valid credentials for closing positions');
+          setTradeResults([{ symbol: 'ALL', status: 'FAILED', message: 'No valid API credentials' }]);
+          setIsTrading(false);
+          return;
+        }
+
+        // 分批平仓以显示进度
+        const batchSize = 3;
+        const allResults: any[] = [];
+        
+        for (let i = 0; i < positionsToClose.length; i += batchSize) {
+          const batch = positionsToClose.slice(i, i + batchSize);
+          
+          try {
+            const res = await fetch(`/api/binance/positions?type=${type}`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'x-api-secret': apiSecret,
+              },
+              body: JSON.stringify({
+                symbols: batch.map(p => p.symbol)
+              })
+            });
+            const data = await res.json();
+            
+            if (data.results) {
+              allResults.push(...data.results);
+              setTradeResults(allResults);
+              setTradeProgress(allResults.length);
+            }
+          } catch (e) {
+            console.error('Batch close failed:', e);
+          }
+        }
+        
+        fetchPositions();
+      } catch (error) {
+        console.error('Failed to close positions', error);
+        setTradeResults([{
+          symbol: 'Error',
+          status: 'FAILED',
+          message: '平仓操作失败，请检查网络连接后重试。'
+        }]);
+      } finally {
+        setIsTrading(false);
+      }
+    };
+
+    setConfirmData({
+      title: '确认平仓',
+      message: `确定要平仓 ${typeText} 吗？`,
+      confirmText: '确定',
+      cancelText: '取消',
+      onConfirm: executeClose,
+      isDangerous: true,
+    });
+    setConfirmOpen(true);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
+      {/* Abstract Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-blue-200/30 blur-3xl" />
+        <div className="absolute top-[10%] right-[0%] w-[40%] h-[40%] rounded-full bg-purple-200/30 blur-3xl" />
+        <div className="absolute bottom-[0%] left-[20%] w-[60%] h-[40%] rounded-full bg-pink-200/30 blur-3xl" />
+      </div>
+
+      <div className="relative z-10 max-w-[1920px] mx-auto p-6 space-y-3 md:space-y-8">
+        {/* Header */}
+        <motion.header 
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="flex justify-between items-center bg-white/70 backdrop-blur-xl px-4 py-3 rounded-2xl shadow-sm border border-white/50 sticky top-4 z-40"
+        >
+          {/* Desktop: Show Title */}
+          <div className="hidden md:flex items-center gap-3">
+            <div className="p-2 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-200">
+              <Activity className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-black tracking-tight text-gray-900">
+                Binance <span className="text-indigo-600">Pro</span>
+              </h1>
+              <p className="text-gray-400 font-medium text-xs">智能量化交易终端</p>
+            </div>
+          </div>
+
+          {/* Mobile: Show Icon Only */}
+          <div className="md:hidden">
+            <div className="p-2 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-200">
+              <Activity className="w-6 h-6 text-white" />
+            </div>
+          </div>
+          
+          {/* Desktop Controls */}
+          <div className="hidden md:flex items-center gap-2 bg-gray-100/50 px-2 py-1 rounded-xl border border-gray-200/50">
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="p-1.5 bg-white hover:bg-gray-50 rounded-lg shadow-sm text-gray-600 transition-colors border border-gray-100"
+              title="交易设置"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-2 px-2 border-l border-gray-200">
+              <span className="text-gray-600 font-bold text-xs">Top:</span>
+              <select 
+                value={limit} 
+                onChange={(e) => handleLimitChange(Number(e.target.value))}
+                className="bg-white border-none rounded-lg px-2 py-1 text-xs font-bold text-gray-800 shadow-sm focus:ring-2 focus:ring-indigo-500 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                {[5, 10, 20, 30, 40, 50].map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Mobile Controls */}
+          <div className="md:hidden flex items-center gap-1.5">
+            <select 
+              value={limit} 
+              onChange={(e) => handleLimitChange(Number(e.target.value))}
+              className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold text-gray-700 shadow-sm focus:ring-2 focus:ring-indigo-500 cursor-pointer hover:bg-gray-50 transition-colors"
+            >
+              {[5, 10, 20, 30, 40, 50].map(n => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="p-1.5 bg-white hover:bg-gray-50 rounded-lg shadow-sm text-gray-600 transition-colors border border-gray-100"
+              title="交易设置"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
+        </motion.header>
+
+        {/* Desktop Layout */}
+        {!hasCredentials ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="hidden lg:flex items-center justify-center flex-1 flex-col gap-6"
+            style={{ height: 'calc(100vh - 200px)' }}
+          >
+            <div className="text-center">
+              <div className="text-6xl mb-4">🔑</div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">请配置 API 密钥</h2>
+              <p className="text-gray-600 font-medium mb-6">在设置中配置你的 Binance API Key 和 Secret 以开始使用</p>
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors shadow-lg"
+              >
+                立即配置
+              </button>
+            </div>
+          </motion.div>
+        ) : (
+          <div className="hidden lg:flex gap-6 overflow-x-auto" style={{ height: 'calc(100vh - 200px)' }}>
+            {/* Left Column: Positions & Stats */}
+            <div className="flex-shrink-0 w-[560px] overflow-hidden">
+              <PositionsTable positions={positions} onClose={handleClosePositions} loading={positionsLoading} walletBalance={walletBalance} hasCredentials={hasCredentials} />
+            </div>
+
+            {/* Right Column: Market Data */}
+            <div className="flex-1 overflow-hidden flex flex-col min-w-0">
+              <div className="flex flex-col 2xl:flex-row gap-6 flex-1 overflow-y-auto 2xl:overflow-x-auto 2xl:overflow-y-hidden pb-2">
+                <div className="flex-1 lg:min-w-[560px] min-h-[400px] 2xl:min-h-0 overflow-hidden">
+                  <MarketList 
+                    title="市值 Top" 
+                    subtitle={`市值前 ${limit} 名`}
+                    data={marketData.topMarket} 
+                    type="market"
+                    icon={<Layers className="w-5 h-5 text-blue-500" />}
+                    color="blue"
+                    onAction={() => handleTrade('LONG')}
+                    actionLabel="一键做多"
+                    isTrading={isTrading}
+                    isLoading={marketLoading}
+                    openPositions={new Set(positions.map(p => p.symbol))}
+                    onOpenPosition={handleOpenPosition}
+                  />
+                </div>
+                <div className="flex-1 lg:min-w-[560px] min-h-[400px] 2xl:min-h-0 overflow-hidden">
+                  <MarketList 
+                    title="涨幅 Top" 
+                    subtitle={`24h 涨幅前 ${limit} 名`}
+                    data={marketData.topGainers} 
+                    type="gainer"
+                    icon={<Activity className="w-5 h-5 text-pink-500" />}
+                    color="pink"
+                    onAction={() => handleTrade('SHORT')}
+                    actionLabel="一键做空"
+                    isTrading={isTrading}
+                    isLoading={marketLoading}
+                    openPositions={new Set(positions.map(p => p.symbol))}
+                    onOpenPosition={handleOpenPosition}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Layout with Tabs */}
+        {!hasCredentials ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="lg:hidden flex items-center justify-center flex-1 flex-col gap-6 bg-white rounded-3xl shadow-sm border border-gray-100"
+            style={{ height: 'calc(100vh - 150px)' }}
+          >
+            <div className="text-center">
+              <div className="text-5xl mb-4">🔑</div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">请配置 API 密钥</h2>
+              <p className="text-gray-600 font-medium mb-6 text-sm">在设置中配置你的 Binance API Key 和 Secret</p>
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors"
+              >
+                去设置
+              </button>
+            </div>
+          </motion.div>
+        ) : (
+          <div className="lg:hidden flex flex-col bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden" style={{ height: 'calc(100vh - 150px)' }}>
+            {/* Tab Headers */}
+            <div className="flex bg-white border-b border-gray-200 sticky top-0 z-30 shrink-0 rounded-t-3xl">
+            <button
+              onClick={() => setActiveTab('positions')}
+              className={`flex-1 px-4 py-3 font-bold text-sm transition-all relative ${
+                activeTab === 'positions'
+                  ? 'text-indigo-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              持仓
+              {activeTab === 'positions' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('marketCap')}
+              className={`flex-1 px-4 py-3 font-bold text-sm transition-all relative ${
+                activeTab === 'marketCap'
+                  ? 'text-indigo-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              市值Top
+              {activeTab === 'marketCap' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('gainers')}
+              className={`flex-1 px-4 py-3 font-bold text-sm transition-all relative ${
+                activeTab === 'gainers'
+                  ? 'text-indigo-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              涨幅Top
+              {activeTab === 'gainers' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600" />
+              )}
+            </button>
+          </div>
+
+          {/* Tab Content */}
+          <div className="flex-1 overflow-hidden">
+            {/* 市值Top Tab */}
+            {activeTab === 'marketCap' && (
+              <div className="h-full w-full overflow-y-auto [&>div]:!rounded-none [&>div]:!border-0 [&>div]:!shadow-none [&>div>div:first-child]:!p-4 [&>div>div:last-child]:!p-2">
+                <MarketList 
+                  title="市值 Top" 
+                  subtitle={`市值前 ${limit} 名`}
+                  data={marketData.topMarket} 
+                  type="market"
+                  icon={<Layers className="w-5 h-5 text-blue-500" />}
+                  color="blue"
+                  onAction={() => handleTrade('LONG')}
+                  actionLabel="一键做多"
+                  isTrading={isTrading}
+                  isLoading={marketLoading}
+                  openPositions={new Set(positions.map(p => p.symbol))}
+                  onOpenPosition={handleOpenPosition}
+                />
+              </div>
+            )}
+
+            {/* 涨幅Top Tab */}
+            {activeTab === 'gainers' && (
+              <div className="h-full w-full overflow-y-auto [&>div]:!rounded-none [&>div]:!border-0 [&>div]:!shadow-none [&>div>div:first-child]:!p-4 [&>div>div:last-child]:!p-2">
+                <MarketList 
+                  title="涨幅 Top" 
+                  subtitle={`24h 涨幅前 ${limit} 名`}
+                  data={marketData.topGainers} 
+                  type="gainer"
+                  icon={<TrendingUp className="w-5 h-5 text-pink-500" />}
+                  color="pink"
+                  onAction={() => handleTrade('SHORT')}
+                  actionLabel="一键做空"
+                  isTrading={isTrading}
+                  isLoading={marketLoading}
+                  openPositions={new Set(positions.map(p => p.symbol))}
+                  onOpenPosition={handleOpenPosition}
+                />
+              </div>
+            )}
+
+            {/* 持仓 Tab */}
+            {activeTab === 'positions' && !hasCredentials && (
+              <div className="h-full w-full flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-4xl mb-3">🔑</div>
+                  <p className="text-gray-600 font-medium mb-4">请先配置 API 密钥</p>
+                  <button
+                    onClick={() => setSettingsOpen(true)}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition-colors"
+                  >
+                    去设置
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 持仓 Tab */}
+            {activeTab === 'positions' && hasCredentials && (
+              <div className="h-full w-full overflow-y-auto">
+                <PositionsTable 
+                  positions={positions} 
+                  onClose={handleClosePositions} 
+                  loading={positionsLoading} 
+                  walletBalance={walletBalance} 
+                  hasCredentials={hasCredentials}
+                />
+              </div>
+            )}
+          </div>
+          </div>
+        )}
+
+        {/* Modals */}
+        <SettingsModal 
+          isOpen={settingsOpen} 
+          onClose={() => setSettingsOpen(false)} 
+        />
+        <TradeModal 
+          isOpen={tradeModalOpen} 
+          onClose={() => setTradeModalOpen(false)} 
+          results={tradeResults} 
+          isTrading={isTrading}
+          total={currentTradeTotal} 
+          progress={tradeProgress}
+          side={tradeSide}
+        />
+        <ConfirmModal
+          isOpen={confirmOpen}
+          title={confirmData.title}
+          message={confirmData.message}
+          confirmText={confirmData.confirmText}
+          cancelText={confirmData.cancelText}
+          onConfirm={() => {
+            confirmData.onConfirm();
+            setConfirmOpen(false);
+          }}
+          onCancel={() => setConfirmOpen(false)}
+          isDangerous={confirmData.isDangerous}
+        />
+      </div>
+    </div>
+  );
+}
