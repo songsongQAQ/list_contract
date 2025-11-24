@@ -629,24 +629,8 @@ export default function BinancePage() {
             </div>
           </div>
 
-          {/* Copytrading Mode Alert & Account Status - Center of Header */}
+          {/* Account Status Display - Center of Header */}
           <div className="flex items-center gap-2">
-            {copytradingMode && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg border border-indigo-200/50 shadow-sm"
-              >
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                </span>
-                <span className="text-xs font-bold">👥 带单模式</span>
-              </motion.div>
-            )}
-            
-            {/* Account Status Display */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
