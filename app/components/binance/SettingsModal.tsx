@@ -24,6 +24,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     ignoredSymbols: '', // 忽略的币种列表（空格分隔）
     takeProfit: '', // 止盈百分比（相对于本金）
     stopLoss: '', // 止损百分比（相对于本金）
+    copytradingMode: false, // 带单模式
+    copytradingApiKey: '', // 带单 API Key
+    copytradingApiSecret: '', // 带单 API Secret
   });
 
   useEffect(() => {
@@ -45,6 +48,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       ignoredSymbols: localStorage.getItem('ignored_symbols') || '',
       takeProfit: localStorage.getItem('take_profit_percent') || '',
       stopLoss: localStorage.getItem('stop_loss_percent') || '',
+      copytradingMode: localStorage.getItem('copytrading_mode') === 'true' || false,
+      copytradingApiKey: localStorage.getItem('copytrading_api_key') || '',
+      copytradingApiSecret: localStorage.getItem('copytrading_api_secret') || '',
     });
   };
 
@@ -58,6 +64,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         return;
       }
 
+      // 如果开启了带单模式，验证带单 API
+      if (settings.copytradingMode) {
+        if (!settings.copytradingApiKey.trim() || !settings.copytradingApiSecret.trim()) {
+          alert('启用带单模式时，请输入带单 API Key 和 Secret');
+          setSaving(false);
+          return;
+        }
+      }
+
       // 保存到 localStorage
       localStorage.setItem('binance_api_key', settings.apiKey.trim());
       localStorage.setItem('binance_api_secret', settings.apiSecret.trim());
@@ -69,6 +84,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       localStorage.setItem('ignored_symbols', settings.ignoredSymbols.trim());
       localStorage.setItem('take_profit_percent', settings.takeProfit);
       localStorage.setItem('stop_loss_percent', settings.stopLoss);
+      localStorage.setItem('copytrading_mode', String(settings.copytradingMode));
+      localStorage.setItem('copytrading_api_key', settings.copytradingApiKey.trim());
+      localStorage.setItem('copytrading_api_secret', settings.copytradingApiSecret.trim());
       
       // 验证保存是否成功
       const savedKey = localStorage.getItem('binance_api_key');
@@ -81,6 +99,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       window.dispatchEvent(new CustomEvent('settingsChanged', {
         detail: {
           defaultLimit: settings.defaultLimit,
+          copytradingMode: settings.copytradingMode,
           credentialsUpdated: true
         }
       }));
@@ -127,9 +146,112 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
             <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
               <>
+                  {/* Copytrading Mode Toggle */}
+                  <div className="space-y-4 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <h3 className="text-sm font-bold text-indigo-700 uppercase tracking-wider">👥 带单模式</h3>
+                        <p className="text-xs text-indigo-600">启用后将开启带单功能（需配置API）</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSettings(prev => ({ ...prev, copytradingMode: !prev.copytradingMode }))}
+                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                          settings.copytradingMode ? 'bg-indigo-600' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                            settings.copytradingMode ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    
+                    <AnimatePresence>
+                      {settings.copytradingMode && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="pt-4 space-y-3 border-t border-indigo-200 mt-2">
+                            <div className="space-y-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                              <p className="text-xs text-red-700 font-bold">⚠️ 请将 <button 
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText('43.159.227.33');
+                                  alert('✓ IP地址已复制到剪贴板！');
+                                }}
+                                className="font-mono font-bold text-red-800 hover:text-red-900 underline decoration-dotted cursor-pointer transition-colors"
+                              >43.159.227.33</button> 设置白名单</p>
+                              <p className="text-xs text-red-700 font-bold">⚠️ 请勿分享给任何人。密钥保存在本地浏览器中。</p>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-gray-600">带单 API Key</label>
+                              <div className="relative">
+                                <input
+                                  type="password"
+                                  value={settings.copytradingApiKey}
+                                  onChange={(e) => setSettings(prev => ({ ...prev, copytradingApiKey: e.target.value }))}
+                                  placeholder="输入带单账号的 API Key"
+                                  className="w-full px-3 py-2 pr-10 bg-white border border-indigo-300 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-0 font-mono text-xs text-gray-900"
+                                />
+                                {settings.copytradingApiKey && (
+                                  <button
+                                    onClick={() => setSettings(prev => ({ ...prev, copytradingApiKey: '' }))}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                    type="button"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-gray-600">带单 API Secret</label>
+                              <div className="relative">
+                                <input
+                                  type="password"
+                                  value={settings.copytradingApiSecret}
+                                  onChange={(e) => setSettings(prev => ({ ...prev, copytradingApiSecret: e.target.value }))}
+                                  placeholder="输入带单账号的 API Secret"
+                                  className="w-full px-3 py-2 pr-10 bg-white border border-indigo-300 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-0 font-mono text-xs text-gray-900"
+                                />
+                                {settings.copytradingApiSecret && (
+                                  <button
+                                    onClick={() => setSettings(prev => ({ ...prev, copytradingApiSecret: '' }))}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                    type="button"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <div className="h-px bg-gray-100" />
+
                   {/* API Settings */}
                   <div className="space-y-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
                     <h3 className="text-sm font-bold text-amber-700 uppercase tracking-wider">🔑 API 密钥设置</h3>
+                    <div className="space-y-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-xs text-red-700 font-bold">⚠️ 请将 <button 
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText('43.159.227.33');
+                          alert('✓ IP地址已复制到剪贴板！');
+                        }}
+                        className="font-mono font-bold text-red-800 hover:text-red-900 underline decoration-dotted cursor-pointer transition-colors"
+                      >43.159.227.33</button> 设置白名单</p>
+                      <p className="text-xs text-red-700 font-bold">⚠️ 请勿分享给任何人。密钥保存在本地浏览器中。</p>
+                    </div>
                     <div className="space-y-3">
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-600">API Key</label>
@@ -139,7 +261,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                             value={settings.apiKey}
                             onChange={(e) => setSettings(prev => ({ ...prev, apiKey: e.target.value }))}
                             placeholder="输入你的 Binance API Key"
-                            className="w-full px-3 py-2 pr-10 bg-white border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono text-xs text-gray-900"
+                            className="w-full px-3 py-2 pr-10 bg-white border border-amber-300 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-0 font-mono text-xs text-gray-900"
                           />
                           {settings.apiKey && (
                             <button
@@ -151,14 +273,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                             </button>
                           )}
                         </div>
-                        <p className="text-xs text-amber-600">⚠️ 请将 <button 
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText('43.159.227.33');
-                            alert('✓ IP地址已复制到剪贴板！');
-                          }}
-                          className="font-mono font-bold text-amber-800 hover:text-amber-900 underline decoration-dotted cursor-pointer transition-colors"
-                        >43.159.227.33</button> 设置白名单</p>
                       </div>
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-600">API Secret</label>
@@ -168,7 +282,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                             value={settings.apiSecret}
                             onChange={(e) => setSettings(prev => ({ ...prev, apiSecret: e.target.value }))}
                             placeholder="输入你的 Binance API Secret"
-                            className="w-full px-3 py-2 pr-10 bg-white border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono text-xs text-gray-900"
+                            className="w-full px-3 py-2 pr-10 bg-white border border-amber-300 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-0 font-mono text-xs text-gray-900"
                           />
                           {settings.apiSecret && (
                             <button
@@ -180,7 +294,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                             </button>
                           )}
                         </div>
-                        <p className="text-xs text-amber-600">⚠️ 请勿分享给任何人。密钥保存在本地浏览器中。</p>
                       </div>
                     </div>
                   </div>
@@ -375,4 +488,3 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     </AnimatePresence>
   );
 };
-

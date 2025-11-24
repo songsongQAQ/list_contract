@@ -15,6 +15,7 @@ export default function BinancePage() {
   const [marketData, setMarketData] = useState<{ topMarket: any[], topGainers: any[], topLosers: any[] }>({ topMarket: [], topGainers: [], topLosers: [] });
   const [positions, setPositions] = useState<any[]>([]);
   const [walletBalance, setWalletBalance] = useState(0);
+  const [copytradingMode, setCopytradingMode] = useState(false);
 
   // 处理 limit 变化并同步到 localStorage
   const handleLimitChange = (newLimit: number) => {
@@ -23,11 +24,15 @@ export default function BinancePage() {
     console.log(`✓ Top 设置已更新为: ${newLimit}`);
   };
 
-  // 在客户端挂载后从 localStorage 读取 limit
+  // 在客户端挂载后从 localStorage 读取 limit 和带单模式
   useEffect(() => {
     const saved = localStorage.getItem('default_limit');
     if (saved) {
       setLimit(parseInt(saved));
+    }
+    const copytrading = localStorage.getItem('copytrading_mode');
+    if (copytrading) {
+      setCopytradingMode(copytrading === 'true');
     }
   }, []);
   
@@ -77,6 +82,29 @@ export default function BinancePage() {
   // API Credentials State
   const [hasCredentials, setHasCredentials] = useState(true);
 
+  const getActiveCredentials = () => {
+    // 检查跟单模式
+    const isCopytradingMode = localStorage.getItem('copytrading_mode') === 'true';
+    
+    if (isCopytradingMode) {
+      // 跟单模式：使用跟单账户凭证
+      const copytradingApiKey = localStorage.getItem('copytrading_api_key')?.trim();
+      const copytradingApiSecret = localStorage.getItem('copytrading_api_secret')?.trim();
+      if (copytradingApiKey && copytradingApiSecret) {
+        console.log(`✅ Using COPYTRADING account (${copytradingApiKey.substring(0, 8)}...)`);
+        return { apiKey: copytradingApiKey, apiSecret: copytradingApiSecret, mode: 'copytrading' };
+      } else {
+        console.warn('⚠️ Copytrading mode enabled but credentials not found');
+      }
+    }
+    
+    // 默认模式：使用主账户凭证
+    const apiKey = localStorage.getItem('binance_api_key')?.trim();
+    const apiSecret = localStorage.getItem('binance_api_secret')?.trim();
+    console.log(`✅ Using MAIN account (${apiKey?.substring(0, 8)}...)`);
+    return { apiKey, apiSecret, mode: 'main' };
+  };
+
   const fetchMarketData = async () => {
     setMarketLoading(true);
     try {
@@ -107,25 +135,46 @@ export default function BinancePage() {
   const fetchPositions = async () => {
     setPositionsLoading(true);
     try {
-      const apiKey = localStorage.getItem('binance_api_key')?.trim();
-      const apiSecret = localStorage.getItem('binance_api_secret')?.trim();
+      const credentials = getActiveCredentials();
 
       // 如果没有有效凭证，直接返回
-      if (!apiKey || !apiSecret) {
-        console.log('No valid credentials for fetching positions');
+      if (!credentials.apiKey || !credentials.apiSecret) {
+        console.log(`No valid credentials for fetching positions (mode: ${credentials.mode})`);
         setPositions([]);
         setWalletBalance(0);
         setPositionsLoading(false);
         return;
       }
 
+      console.log(`Fetching positions using ${credentials.mode} account`);
+
       const res = await fetch('/api/binance/positions', {
         headers: {
-          'x-api-key': apiKey,
-          'x-api-secret': apiSecret,
+          'x-api-key': credentials.apiKey,
+          'x-api-secret': credentials.apiSecret,
         },
       });
+      
       const data = await res.json();
+      
+      // 如果响应失败，显示错误原因
+      if (!res.ok) {
+        const errorMsg = data.error || '未知错误';
+        console.error(`❌ ${credentials.mode} account error: ${errorMsg}`);
+        
+        if (credentials.mode === 'copytrading') {
+          console.error(`📋 错误详情: ${errorMsg}`);
+          console.error('💡 请检查:');
+          console.error('  1. API Key 和 Secret 是否正确');
+          console.error('  2. IP 地址是否在白名单中 (43.159.227.33)');
+          console.error('  3. API 权限是否包含期货交易权限');
+        }
+        
+        setPositions([]);
+        setWalletBalance(0);
+        return;
+      }
+      
       if (data.positions) {
         setPositions(data.positions);
         setWalletBalance(data.walletBalance || 0);
@@ -190,6 +239,9 @@ export default function BinancePage() {
       const customEvent = event as CustomEvent;
       if (customEvent.detail && customEvent.detail.defaultLimit) {
         setLimit(parseInt(customEvent.detail.defaultLimit));
+      }
+      if (customEvent.detail && customEvent.detail.copytradingMode !== undefined) {
+        setCopytradingMode(customEvent.detail.copytradingMode);
       }
       // 页面重新加载会自动检查凭证
     };
@@ -256,32 +308,63 @@ export default function BinancePage() {
       const takeProfitPercent = takeProfitMultiple > 0 ? (margin * takeProfitMultiple / 100) / notional * 100 : 0;
       const stopLossPercent = stopLossMultiple > 0 ? (margin * stopLossMultiple / 100) / notional * 100 : 0;
 
+      // 获取活跃账户凭证（主账户或跟单账户）
+      const credentials = getActiveCredentials();
+
       const batchSize = 5;
       for (let i = 0; i < symbols.length; i += batchSize) {
         const batch = symbols.slice(i, i + batchSize);
         
         try {
-          const apiKey = localStorage.getItem('binance_api_key')?.trim();
-          const apiSecret = localStorage.getItem('binance_api_secret')?.trim();
-
-          if (!apiKey || !apiSecret) {
-            console.error('No valid credentials for trading');
+          if (!credentials.apiKey || !credentials.apiSecret) {
+            console.error(`No valid credentials for trading (mode: ${credentials.mode})`);
             continue;
           }
+
+          console.log(`Trading using ${credentials.mode} account: ${batch.join(', ')}`);
 
           const res = await fetch('/api/binance/trade', {
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json',
-              'x-api-key': apiKey,
-              'x-api-secret': apiSecret,
+              'x-api-key': credentials.apiKey,
+              'x-api-secret': credentials.apiSecret,
             },
             body: JSON.stringify({ symbols: batch, side, leverage, notional, takeProfitPercent, stopLossPercent })
           });
+          
           const data = await res.json();
-          setTradeResults(prev => [...prev, ...(data.results || [])]);
+          
+          // 如果响应失败，显示错误原因
+          if (!res.ok) {
+            const errorMsg = data.error || '未知错误';
+            console.error(`❌ ${credentials.mode} account trade error: ${errorMsg}`);
+            
+            if (credentials.mode === 'copytrading') {
+              console.error(`📋 错误详情: ${errorMsg}`);
+              console.error('💡 请检查:');
+              console.error('  1. API Key 和 Secret 是否正确');
+              console.error('  2. IP 地址是否在白名单中 (43.159.227.33)');
+              console.error('  3. API 权限是否包含期货交易权限');
+              console.error('  4. 账户余额是否充足');
+            }
+            
+            // 将错误信息添加到结果中显示
+            setTradeResults(prev => [...prev, { 
+              symbol: batch.join(','), 
+              status: 'FAILED', 
+              message: errorMsg 
+            }]);
+          } else {
+            setTradeResults(prev => [...prev, ...(data.results || [])]);
+          }
         } catch (e) {
           console.error(e);
+          setTradeResults(prev => [...prev, { 
+            symbol: batch.join(','), 
+            status: 'FAILED', 
+            message: e instanceof Error ? e.message : '网络错误' 
+          }]);
         }
 
         setTradeProgress(Math.min(i + batchSize, symbols.length));
@@ -333,30 +416,56 @@ export default function BinancePage() {
       const takeProfitPercent = takeProfitMultiple > 0 ? (margin * takeProfitMultiple / 100) / notional * 100 : 0;
       const stopLossPercent = stopLossMultiple > 0 ? (margin * stopLossMultiple / 100) / notional * 100 : 0;
 
-      try {
-        const apiKey = localStorage.getItem('binance_api_key')?.trim();
-        const apiSecret = localStorage.getItem('binance_api_secret')?.trim();
+      // 获取活跃账户凭证（主账户或跟单账户）
+      const credentials = getActiveCredentials();
 
-        if (!apiKey || !apiSecret) {
-          console.error('No valid credentials for trading');
+      try {
+        if (!credentials.apiKey || !credentials.apiSecret) {
+          console.error(`No valid credentials for trading (mode: ${credentials.mode})`);
           setTradeResults([{ symbol, status: 'FAILED', message: 'No valid API credentials' }]);
           setIsTrading(false);
           return;
         }
 
+        console.log(`Opening position using ${credentials.mode} account: ${symbol}`);
+
         const res = await fetch('/api/binance/trade', {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'x-api-secret': apiSecret,
+            'x-api-key': credentials.apiKey,
+            'x-api-secret': credentials.apiSecret,
           },
           body: JSON.stringify({ symbols: [symbol], side, leverage, notional, takeProfitPercent, stopLossPercent })
         });
+        
         const data = await res.json();
-        setTradeResults(data.results || []);
+        
+        // 如果响应失败，显示错误原因
+        if (!res.ok) {
+          const errorMsg = data.error || '未知错误';
+          console.error(`❌ ${credentials.mode} account open position error: ${errorMsg}`);
+          
+          if (credentials.mode === 'copytrading') {
+            console.error(`📋 错误详情: ${errorMsg}`);
+            console.error('💡 请检查:');
+            console.error('  1. API Key 和 Secret 是否正确');
+            console.error('  2. IP 地址是否在白名单中 (43.159.227.33)');
+            console.error('  3. API 权限是否包含期货交易权限');
+            console.error('  4. 账户余额是否充足');
+          }
+          
+          setTradeResults([{ symbol, status: 'FAILED', message: errorMsg }]);
+        } else {
+          setTradeResults(data.results || []);
+        }
       } catch (e) {
         console.error(e);
+        setTradeResults([{ 
+          symbol, 
+          status: 'FAILED', 
+          message: e instanceof Error ? e.message : '网络错误' 
+        }]);
       }
 
       setIsTrading(false);
@@ -391,16 +500,18 @@ export default function BinancePage() {
       });
       setCurrentTradeTotal(positionsToClose.length);
 
-      try {
-        const apiKey = localStorage.getItem('binance_api_key')?.trim();
-        const apiSecret = localStorage.getItem('binance_api_secret')?.trim();
+      // 获取活跃账户凭证（主账户或跟单账户）
+      const credentials = getActiveCredentials();
 
-        if (!apiKey || !apiSecret) {
-          console.error('No valid credentials for closing positions');
+      try {
+        if (!credentials.apiKey || !credentials.apiSecret) {
+          console.error(`No valid credentials for closing positions (mode: ${credentials.mode})`);
           setTradeResults([{ symbol: 'ALL', status: 'FAILED', message: 'No valid API credentials' }]);
           setIsTrading(false);
           return;
         }
+
+        console.log(`Closing positions using ${credentials.mode} account: ${type}`);
 
         // 分批平仓以显示进度
         const batchSize = 3;
@@ -414,8 +525,8 @@ export default function BinancePage() {
               method: 'DELETE',
               headers: {
                 'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'x-api-secret': apiSecret,
+                'x-api-key': credentials.apiKey,
+                'x-api-secret': credentials.apiSecret,
               },
               body: JSON.stringify({
                 symbols: batch.map(p => p.symbol)
@@ -423,13 +534,38 @@ export default function BinancePage() {
             });
             const data = await res.json();
             
-            if (data.results) {
+            // 如果响应失败，显示错误原因
+            if (!res.ok) {
+              const errorMsg = data.error || '未知错误';
+              console.error(`❌ ${credentials.mode} account close error: ${errorMsg}`);
+              
+              if (credentials.mode === 'copytrading') {
+                console.error(`📋 错误详情: ${errorMsg}`);
+                console.error('💡 请检查:');
+                console.error('  1. API Key 和 Secret 是否正确');
+                console.error('  2. IP 地址是否在白名单中 (43.159.227.33)');
+                console.error('  3. API 权限是否包含期货交易权限');
+              }
+              
+              allResults.push({ 
+                symbol: batch.map((p: any) => p.symbol).join(','), 
+                status: 'FAILED', 
+                message: errorMsg 
+              });
+            } else if (data.results) {
               allResults.push(...data.results);
-              setTradeResults(allResults);
-              setTradeProgress(allResults.length);
             }
+            
+            setTradeResults(allResults);
+            setTradeProgress(allResults.length);
           } catch (e) {
             console.error('Batch close failed:', e);
+            allResults.push({ 
+              symbol: batch.map((p: any) => p.symbol).join(','), 
+              status: 'FAILED', 
+              message: e instanceof Error ? e.message : '网络错误' 
+            });
+            setTradeResults(allResults);
           }
         }
         
@@ -439,7 +575,7 @@ export default function BinancePage() {
         setTradeResults([{
           symbol: 'Error',
           status: 'FAILED',
-          message: '平仓操作失败，请检查网络连接后重试。'
+          message: error instanceof Error ? error.message : '平仓操作失败，请检查网络连接后重试。'
         }]);
       } finally {
         setIsTrading(false);
@@ -491,6 +627,42 @@ export default function BinancePage() {
             <div className="p-2 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-200">
               <Activity className="w-6 h-6 text-white" />
             </div>
+          </div>
+
+          {/* Copytrading Mode Alert & Account Status - Center of Header */}
+          <div className="flex items-center gap-2">
+            {copytradingMode && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg border border-indigo-200/50 shadow-sm"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                </span>
+                <span className="text-xs font-bold">👥 带单模式</span>
+              </motion.div>
+            )}
+            
+            {/* Account Status Display */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-sm text-xs font-bold ${
+                copytradingMode
+                  ? 'bg-green-50 text-green-700 border-green-200/50'
+                  : 'bg-blue-50 text-blue-700 border-blue-200/50'
+              }`}
+              title={copytradingMode ? '正在使用带单账户' : '正在使用主账户'}
+            >
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-600"></span>
+              </span>
+              <span>{copytradingMode ? '带单账户' : '主账户'}</span>
+            </motion.div>
           </div>
           
           {/* Desktop Controls */}

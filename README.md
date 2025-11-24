@@ -310,13 +310,21 @@ npm run start            # 启动生产服务器
 npm run lint             # 代码检查
 ```
 
-## 📚 了解更多
+## 📚 其他文档
 
-- [Next.js 文档](https://nextjs.org/docs) - Next.js 框架文档
-- [Tailwind CSS 文档](https://tailwindcss.com/docs) - Tailwind CSS 样式框架
-- [Framer Motion 文档](https://www.framer.com/motion/) - 动画库文档
-- [CCXT 文档](https://docs.ccxt.com/) - 加密货币交易库文档
-- [Binance API 文档](https://binance-docs.github.io/apidocs/) - Binance API 官方文档
+### 跟单模式（Copy Trading）
+
+如果你需要支持多个交易账户（如跟单功能），请查看：
+- **[README_COPYTRADING.md](./README_COPYTRADING.md)** - 完整的跟单模式实现指南
+- **[QUICK_REFERENCE.md](./QUICK_REFERENCE.md)** - 快速参考卡片
+
+### 官方文档
+
+- [Next.js 文档](https://nextjs.org/docs) - Next.js 框架
+- [Tailwind CSS 文档](https://tailwindcss.com/docs) - 样式框架
+- [Framer Motion 文档](https://www.framer.com/motion/) - 动画库
+- [CCXT 文档](https://docs.ccxt.com/) - 加密货币交易库
+- [Binance API 文档](https://binance-docs.github.io/apidocs/) - Binance API
 
 ## 📄 许可证
 
