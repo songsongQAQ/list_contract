@@ -1,21 +1,19 @@
 'use server';
 
-import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 
+// 临时实现 - 使用内存存储替代 Prisma 数据库
+const configStore = new Map<string, string>();
+
 export async function getSiteConfig(key: string) {
-  const config = await prisma.siteConfig.findUnique({
-    where: { key },
-  });
-  return config?.value;
+  // 从内存存储中获取配置
+  const value = configStore.get(key);
+  return value || null;
 }
 
 export async function setSiteConfig(key: string, value: string) {
-  await prisma.siteConfig.upsert({
-    where: { key },
-    update: { value },
-    create: { key, value },
-  });
+  // 在内存中存储配置
+  configStore.set(key, value);
   
   // 重新验证所有页面，因为主题是全局的
   revalidatePath('/', 'layout');
