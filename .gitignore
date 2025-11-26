@@ -50,3 +50,5 @@ next-env.d.ts
 
 # Credentials
 .credentials/
+
+/lib/generated/prisma

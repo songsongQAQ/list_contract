@@ -1,0 +1,54 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表
+model User {
+  id        String    @id @default(cuid())
+  username  String    @unique // 用户名（唯一）
+  password  String    // 密码（加密存储）
+  createdAt DateTime  @default(now()) @map("created_at") // 创建时间
+  updatedAt DateTime  @updatedAt @map("updated_at") // 更新时间
+  config    UserConfig? // 用户配置（一对一关系）
+
+  @@map("users") // 数据库表名
+}
+
+// 用户配置表（存储交易相关配置）
+model UserConfig {
+  id                    String   @id @default(cuid())
+  userId                String   @unique // 用户ID（外键）
+  // API 密钥配置
+  apiKey                String?  @db.Text // Binance API Key
+  apiSecret             String?  @db.Text // Binance API Secret
+  // 做多设置
+  longLeverage          String   @default("50") // 做多杠杆倍数
+  longMargin            String   @default("3") // 做多本金（USDT）
+  // 做空设置
+  shortLeverage         String   @default("50") // 做空杠杆倍数
+  shortMargin           String   @default("3") // 做空本金（USDT）
+  // 其他设置
+  defaultLimit          String   @default("10") // 排行榜默认显示数量
+  ignoredSymbols        String?  @db.Text // 忽略的币种列表（空格分隔）
+  takeProfit            String?  // 止盈百分比（相对于本金）
+  stopLoss              String?  // 止损百分比（相对于本金）
+  // 带单模式设置
+  copytradingMode       Boolean  @default(false) // 带单模式开关
+  copytradingApiKey     String?  @db.Text // 带单 API Key
+  copytradingApiSecret  String?  @db.Text // 带单 API Secret
+  // 时间戳
+  createdAt             DateTime @default(now()) @map("created_at") // 创建时间
+  updatedAt             DateTime @updatedAt @map("updated_at") // 更新时间
+  // 关联关系
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade) // 关联用户
+
+  @@map("user_configs") // 数据库表名
+}

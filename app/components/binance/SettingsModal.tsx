@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save } from 'lucide-react';
+import { X, Save, Loader } from 'lucide-react';
+import { message } from 'antd';
+import { userConfigStorage } from '@/lib/storage';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -35,23 +37,56 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     }
   }, [isOpen]);
 
-  const fetchSettings = () => {
-    // 从 localStorage 读取设置
-    setSettings({
-      apiKey: localStorage.getItem('binance_api_key') || '',
-      apiSecret: localStorage.getItem('binance_api_secret') || '',
-      longLeverage: localStorage.getItem('trading_long_leverage') || '50',
-      longMargin: localStorage.getItem('trading_long_margin') || '3',
-      shortLeverage: localStorage.getItem('trading_short_leverage') || '50',
-      shortMargin: localStorage.getItem('trading_short_margin') || '3',
-      defaultLimit: localStorage.getItem('default_limit') || '10',
-      ignoredSymbols: localStorage.getItem('ignored_symbols') || '',
-      takeProfit: localStorage.getItem('take_profit_percent') || '',
-      stopLoss: localStorage.getItem('stop_loss_percent') || '',
-      copytradingMode: localStorage.getItem('copytrading_mode') === 'true' || false,
-      copytradingApiKey: localStorage.getItem('copytrading_api_key') || '',
-      copytradingApiSecret: localStorage.getItem('copytrading_api_secret') || '',
-    });
+  const fetchSettings = async () => {
+    try {
+      // 先从本地缓存读取
+      const cachedConfig = userConfigStorage.get();
+      if (cachedConfig) {
+        setSettings({
+          apiKey: cachedConfig.apiKey || '',
+          apiSecret: cachedConfig.apiSecret || '',
+          longLeverage: cachedConfig.longLeverage || '50',
+          longMargin: cachedConfig.longMargin || '3',
+          shortLeverage: cachedConfig.shortLeverage || '50',
+          shortMargin: cachedConfig.shortMargin || '3',
+          defaultLimit: cachedConfig.defaultLimit || '10',
+          ignoredSymbols: cachedConfig.ignoredSymbols || '',
+          takeProfit: cachedConfig.takeProfit || '',
+          stopLoss: cachedConfig.stopLoss || '',
+          copytradingMode: cachedConfig.copytradingMode || false,
+          copytradingApiKey: cachedConfig.copytradingApiKey || '',
+          copytradingApiSecret: cachedConfig.copytradingApiSecret || '',
+        });
+      }
+      
+      // 然后从服务器获取最新配置
+      const res = await fetch('/api/user/config');
+      if (res.ok) {
+        const data = await res.json();
+        const config = data.config || {};
+        
+        // 保存到本地缓存
+        userConfigStorage.set(config);
+        
+        setSettings({
+          apiKey: config.apiKey || '',
+          apiSecret: config.apiSecret || '',
+          longLeverage: config.longLeverage || '50',
+          longMargin: config.longMargin || '3',
+          shortLeverage: config.shortLeverage || '50',
+          shortMargin: config.shortMargin || '3',
+          defaultLimit: config.defaultLimit || '10',
+          ignoredSymbols: config.ignoredSymbols || '',
+          takeProfit: config.takeProfit || '',
+          stopLoss: config.stopLoss || '',
+          copytradingMode: config.copytradingMode || false,
+          copytradingApiKey: config.copytradingApiKey || '',
+          copytradingApiSecret: config.copytradingApiSecret || '',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch settings:', error);
+    }
   };
 
   const handleSave = async () => {
@@ -59,7 +94,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     try {
       // 验证 API Key 和 Secret
       if (!settings.apiKey.trim() || !settings.apiSecret.trim()) {
-        alert('请输入 API Key 和 API Secret');
+        message.warning('请输入 API Key 和 API Secret');
         setSaving(false);
         return;
       }
@@ -67,33 +102,60 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       // 如果开启了带单模式，验证带单 API
       if (settings.copytradingMode) {
         if (!settings.copytradingApiKey.trim() || !settings.copytradingApiSecret.trim()) {
-          alert('启用带单模式时，请输入带单 API Key 和 Secret');
+          message.warning('启用带单模式时，请输入带单 API Key 和 Secret');
           setSaving(false);
           return;
         }
       }
 
-      // 保存到 localStorage
-      localStorage.setItem('binance_api_key', settings.apiKey.trim());
-      localStorage.setItem('binance_api_secret', settings.apiSecret.trim());
-      localStorage.setItem('trading_long_leverage', settings.longLeverage);
-      localStorage.setItem('trading_long_margin', settings.longMargin);
-      localStorage.setItem('trading_short_leverage', settings.shortLeverage);
-      localStorage.setItem('trading_short_margin', settings.shortMargin);
-      localStorage.setItem('default_limit', settings.defaultLimit);
-      localStorage.setItem('ignored_symbols', settings.ignoredSymbols.trim());
-      localStorage.setItem('take_profit_percent', settings.takeProfit);
-      localStorage.setItem('stop_loss_percent', settings.stopLoss);
-      localStorage.setItem('copytrading_mode', String(settings.copytradingMode));
-      localStorage.setItem('copytrading_api_key', settings.copytradingApiKey.trim());
-      localStorage.setItem('copytrading_api_secret', settings.copytradingApiSecret.trim());
+      // 保存到数据库
+      const res = await fetch('/api/user/config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          apiKey: settings.apiKey.trim(),
+          apiSecret: settings.apiSecret.trim(),
+          longLeverage: settings.longLeverage,
+          longMargin: settings.longMargin,
+          shortLeverage: settings.shortLeverage,
+          shortMargin: settings.shortMargin,
+          defaultLimit: settings.defaultLimit,
+          ignoredSymbols: settings.ignoredSymbols.trim(),
+          takeProfit: settings.takeProfit,
+          stopLoss: settings.stopLoss,
+          copytradingMode: settings.copytradingMode,
+          copytradingApiKey: settings.copytradingApiKey.trim(),
+          copytradingApiSecret: settings.copytradingApiSecret.trim(),
+        }),
+      });
       
-      // 验证保存是否成功
-      const savedKey = localStorage.getItem('binance_api_key');
-      const savedSecret = localStorage.getItem('binance_api_secret');
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || '保存失败');
+      }
       
-      console.log('✓ Settings saved to localStorage');
-      console.log(`✓ Verified: apiKey=${savedKey ? 'saved (' + savedKey.length + ' chars)' : 'NOT saved'}, apiSecret=${savedSecret ? 'saved (' + savedSecret.length + ' chars)' : 'NOT saved'}`);
+      await res.json();
+      console.log('✓ Settings saved to database');
+      
+      // 保存到本地缓存
+      const configToSave = {
+        apiKey: settings.apiKey.trim(),
+        apiSecret: settings.apiSecret.trim(),
+        longLeverage: settings.longLeverage,
+        longMargin: settings.longMargin,
+        shortLeverage: settings.shortLeverage,
+        shortMargin: settings.shortMargin,
+        defaultLimit: settings.defaultLimit,
+        ignoredSymbols: settings.ignoredSymbols.trim(),
+        takeProfit: settings.takeProfit,
+        stopLoss: settings.stopLoss,
+        copytradingMode: settings.copytradingMode,
+        copytradingApiKey: settings.copytradingApiKey.trim(),
+        copytradingApiSecret: settings.copytradingApiSecret.trim(),
+      };
+      userConfigStorage.set(configToSave);
       
       // 触发页面更新事件
       window.dispatchEvent(new CustomEvent('settingsChanged', {
@@ -104,13 +166,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         }
       }));
       
-      alert('设置已保存！✓');
+      message.success('设置已保存！✓');
       
       // 刷新页面以应用新设置
       window.location.reload();
     } catch (error) {
       console.error('Failed to save settings:', error);
-      alert('保存失败，请重试：' + (error instanceof Error ? error.message : '未知错误'));
+      message.error('保存失败，请重试：' + (error instanceof Error ? error.message : '未知错误'));
     } finally {
       setSaving(false);
     }
@@ -144,7 +206,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               </button>
             </div>
 
-            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto" style={{ opacity: saving ? 0.6 : 1, pointerEvents: saving ? 'none' : 'auto' }}>
               <>
                   {/* Copytrading Mode Toggle */}
                   <div className="space-y-4 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
@@ -182,7 +244,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                                 type="button"
                                 onClick={() => {
                                   navigator.clipboard.writeText('43.159.227.33');
-                                  alert('✓ IP地址已复制到剪贴板！');
+                                  message.success('✓ IP地址已复制到剪贴板！');
                                 }}
                                 className="font-mono font-bold text-red-800 hover:text-red-900 underline decoration-dotted cursor-pointer transition-colors"
                               >43.159.227.33</button> 设置白名单</p>
@@ -246,7 +308,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                         type="button"
                         onClick={() => {
                           navigator.clipboard.writeText('43.159.227.33');
-                          alert('✓ IP地址已复制到剪贴板！');
+                          message.success('✓ IP地址已复制到剪贴板！');
                         }}
                         className="font-mono font-bold text-red-800 hover:text-red-900 underline decoration-dotted cursor-pointer transition-colors"
                       >43.159.227.33</button> 设置白名单</p>
@@ -469,7 +531,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-xl transition-colors"
+                disabled={saving}
+                className="px-4 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 取消
               </button>
@@ -478,8 +541,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 disabled={saving}
                 className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-indigo-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
               >
-                <Save className="w-4 h-4" />
-                保存设置
+                {saving ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    保存中...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    保存设置
+                  </>
+                )}
               </button>
             </div>
           </motion.div>

@@ -5,8 +5,8 @@ export const dynamic = 'force-dynamic';
 
 // 格式化市值
 const formatMarketCap = (num: number): string => {
-  if (num >= 1e12) return (num / 1e12).toFixed(2) + '兆'; // 万亿（Trillion）
-  if (num >= 1e9) return (num / 1e9).toFixed(2) + '亿'; // 十亿（Billion）
+  if (num >= 1e12) return (num / 1e12).toFixed(2) + '万亿'; // 万亿（Trillion）
+  if (num >= 1e8) return (num / 1e8).toFixed(2) + '亿'; // 亿（1亿 = 1e8）
   if (num >= 1e6) return (num / 1e6).toFixed(2) + '百万'; // 百万（Million）
   return num.toFixed(2);
 };
@@ -77,22 +77,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '50');
     
-    // 从请求头获取 API 凭证，确保只有非空字符串才传递
-    const apiKeyHeader = request.headers.get('x-api-key');
-    const apiSecretHeader = request.headers.get('x-api-secret');
-    
-    const apiKey = (apiKeyHeader && apiKeyHeader.trim()) ? apiKeyHeader.trim() : undefined;
-    const apiSecret = (apiSecretHeader && apiSecretHeader.trim()) ? apiSecretHeader.trim() : undefined;
-    
-    console.log('Market API - Credentials:', { 
-      hasKey: !!apiKey, 
-      hasSecret: !!apiSecret 
-    });
-    
-    // 并行获取币安交易数据和市值数据
-    // market API 不需要认证，所以 requireAuth = false
+    // market API 不需要认证，使用公开客户端
     const [client, marketCapMap] = await Promise.all([
-      getBinanceClient(apiKey, apiSecret, false),
+      getBinanceClient(undefined, undefined, false),
       getMarketCapData()
     ]);
     
@@ -132,30 +119,29 @@ export async function GET(request: Request) {
     });
 
     // 将市值数据添加到 ticker 中
-    const enrichedTickers = usdtTickers.map((ticker: any) => {
+    const enrichedTickers = usdtTickers.map((ticker: any, index: number) => {
       // 提取币种符号（如 BTC/USDT:USDT -> BTC）
       const coinSymbol = ticker.symbol.split('/')[0];
-      const marketCapData = marketCapMap?.get(coinSymbol) || {
-        marketCap: 0,
-        marketCapFormatted: 'N/A',
-        rank: 999999,
-      };
+      const marketCapData = marketCapMap?.get(coinSymbol);
       
       return {
         ...ticker,
-        ...marketCapData,
+        marketCap: marketCapData?.marketCap || 0,
+        marketCapFormatted: marketCapData?.marketCapFormatted || 'N/A',
+        rank: marketCapData?.rank || null, // 没有市值数据时 rank 为 null
+        hasMarketCapData: !!marketCapData, // 标记是否有市值数据
       };
     });
 
     // Sort by Market Cap (真实市值排序)
     // 只选择有市值数据的币种（排除市值为0或N/A的）
-    const withMarketCap = enrichedTickers.filter((t: any) => t.marketCap > 0);
+    const withMarketCap = enrichedTickers.filter((t: any) => t.hasMarketCapData);
     
     let topMarket;
     if (withMarketCap.length >= limit) {
-      // 如果有足够的市值数据，按市值排序
+      // 如果有足够的市值数据，按市值排序（按 rank 排名排序）
       topMarket = [...withMarketCap]
-        .sort((a: any, b: any) => (b.marketCap || 0) - (a.marketCap || 0))
+        .sort((a: any, b: any) => (a.rank || 999999) - (b.rank || 999999))
         .slice(0, limit)
         .map((t: any) => ({
           symbol: t.symbol,

@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { getBinanceClient } from '@/lib/binance-client';
+import { getUserConfigFromDB } from '@/lib/user-config';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,21 +19,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
     }
     
-    const apiKey = request.headers.get('x-api-key')?.trim();
-    const apiSecret = request.headers.get('x-api-secret')?.trim();
+    const credentials = await getUserConfigFromDB();
 
-    console.log('Trade API - Received credentials:', { 
-      apiKey: apiKey ? `${apiKey.substring(0, 8)}... (${apiKey.length} chars)` : 'empty', 
-      apiSecret: apiSecret ? `${apiSecret.substring(0, 8)}... (${apiSecret.length} chars)` : 'empty' 
-    });
-
-    if (!apiKey || !apiSecret || apiKey.length === 0 || apiSecret.length === 0) {
-      console.error('Invalid credentials in headers for trade');
+    if (!credentials || !credentials.apiKey || !credentials.apiSecret) {
+      console.error('No credentials found in database for trade');
       return NextResponse.json(
-        { error: 'Missing API credentials in request headers. Please configure them in Settings.' },
+        { error: '请先在设置中配置 API 密钥' },
         { status: 401 }
       );
     }
+
+    const { apiKey, apiSecret } = credentials;
+
+    console.log('Trade API - Using credentials:', { 
+      apiKey: `${apiKey.substring(0, 8)}... (${apiKey.length} chars)`, 
+      mode: credentials.mode
+    });
     
     console.log(`Trade request: symbols=${symbols.length}, side=${side}, leverage=${leverage}, notional=${notional}`);
 

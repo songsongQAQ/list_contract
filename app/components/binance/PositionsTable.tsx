@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, ArrowUpRight, ArrowDownRight, X, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
+import { Wallet, ArrowUpRight, ArrowDownRight, X, Trash2, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
 
 interface Position {
   symbol: string;
@@ -24,9 +24,10 @@ interface PositionsTableProps {
   loading: boolean;
   walletBalance?: number;
   hasCredentials?: boolean;
+  onRefresh?: () => void;
 }
 
-export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClose, loading, walletBalance = 0, hasCredentials = true }) => {
+export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClose, loading, walletBalance = 0, hasCredentials = true, onRefresh }) => {
   // 通过 UA 检测移动端
   const [isMobile, setIsMobile] = useState(false);
   const [activeTab, setActiveTab] = useState<'ALL' | 'LONG' | 'SHORT'>('ALL');
@@ -88,19 +89,31 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
             </div>
           </div>
 
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200">
-            {(['ALL', 'LONG', 'SHORT'] as const).map((tab) => (
+          <div className="flex items-center gap-2">
+            {onRefresh && (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${activeTab === tab
-                    ? 'bg-white text-indigo-700 shadow-sm border border-gray-100'
-                    : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                onClick={onRefresh}
+                disabled={loading}
+                className="p-2 rounded-lg transition-all disabled:opacity-50 bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-600"
+                title="刷新持仓"
               >
-                {tab === 'ALL' ? '全部' : tab === 'LONG' ? '多单' : '空单'}
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
-            ))}
+            )}
+            <div className="flex gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200">
+              {(['ALL', 'LONG', 'SHORT'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${activeTab === tab
+                      ? 'bg-white text-indigo-700 shadow-sm border border-gray-100'
+                      : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                >
+                  {tab === 'ALL' ? '全部' : tab === 'LONG' ? '多单' : '空单'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

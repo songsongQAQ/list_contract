@@ -1,8 +1,8 @@
 {
   "name": "list-contract",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "榜单合约系统 - 基于 Binance 期货的榜单交易终端",
+  "description": "榜单合约 - 基于 Binance 期货的榜单交易终端",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,15 +10,22 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.1.0",
+    "@prisma/client": "^6.19.0",
+    "antd": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "ccxt": "^4.5.20",
     "framer-motion": "^12.23.24",
     "lucide-react": "^0.554.0",
     "next": "16.0.3",
+    "next-auth": "^5.0.0-beta.30",
+    "prisma": "^6.19.0",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

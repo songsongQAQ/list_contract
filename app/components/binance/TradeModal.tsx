@@ -112,13 +112,13 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, results
                       </span>
                     )}
                     {res.status === 'SKIPPED' && (
-                      <span className="flex items-center gap-1 text-xs font-bold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-lg">
-                        <AlertCircle className="w-3 h-3" /> 跳过
+                      <span className="flex items-center gap-1 text-xs font-bold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-lg" title={res.message}>
+                        <AlertCircle className="w-3 h-3" /> {res.message || '跳过'}
                       </span>
                     )}
                     {res.status === 'FAILED' && (
-                      <span className="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded-lg">
-                        <XCircle className="w-3 h-3" /> 失败
+                      <span className="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded-lg" title={res.message}>
+                        <XCircle className="w-3 h-3" /> {res.message || '失败'}
                       </span>
                     )}
                   </div>

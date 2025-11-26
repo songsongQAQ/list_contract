@@ -27,6 +27,7 @@ interface MarketListProps {
   isLoading?: boolean;
   openPositions?: Set<string>;
   onOpenPosition?: (symbol: string, side: 'LONG' | 'SHORT') => void;
+  ignoredSymbols?: string; // 忽略的币种列表（空格分隔）
 }
 
 export const MarketList: React.FC<MarketListProps> = ({ 
@@ -41,7 +42,8 @@ export const MarketList: React.FC<MarketListProps> = ({
   isTrading,
   isLoading = false,
   openPositions = new Set(),
-  onOpenPosition
+  onOpenPosition,
+  ignoredSymbols = ''
 }) => {
   const isLong = type === 'market' || type === 'loser';
   const isLoser = type === 'loser';
@@ -57,8 +59,8 @@ export const MarketList: React.FC<MarketListProps> = ({
     return formatted;
   };
 
-  // 获取忽略的币种列表
-  const ignoredSymbolsStr = typeof window !== 'undefined' ? localStorage.getItem('ignored_symbols') || '' : '';
+  // 获取忽略的币种列表（优先使用传入的 prop，否则从 localStorage 读取）
+  const ignoredSymbolsStr = ignoredSymbols || (typeof window !== 'undefined' ? localStorage.getItem('ignored_symbols') || '' : '');
   const ignoredSet = new Set(
     ignoredSymbolsStr
       .split(/\s+/)
@@ -156,6 +158,10 @@ export const MarketList: React.FC<MarketListProps> = ({
                     {isOpen ? (
                       <span className="px-2 py-1 rounded-lg font-bold text-xs bg-green-50 text-green-600 whitespace-nowrap" title="已开仓">
                         已开仓
+                      </span>
+                    ) : isSymbolIgnored(item.symbol) ? (
+                      <span className="px-2 py-1 rounded-lg font-bold text-xs bg-gray-100 text-gray-500 whitespace-nowrap" title="已被添加到忽略列表">
+                        已忽略
                       </span>
                     ) : (
                       <button
