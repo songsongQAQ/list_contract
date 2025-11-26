@@ -75,14 +75,14 @@ export const TradeModal: React.FC<TradeModalProps> = ({ isOpen, onClose, results
             </div>
 
             {/* Progress */}
-            {isTrading && (
+            {(isTrading || progress > 0) && total > 0 && (
               <div className="px-6 pt-6">
                 <div className="flex justify-between items-center text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">
                   <div className="flex items-center gap-2">
                     <span>Progress</span>
                     <span className={`font-bold ${sideColor}`}>[{sideText}]</span>
                   </div>
-                  <span>{Math.round((progress / total) * 100)}%</span>
+                  <span>{progress}/{total} - {Math.round((progress / total) * 100)}%</span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
                   <motion.div 

@@ -20,7 +20,7 @@ interface Position {
 
 interface PositionsTableProps {
   positions: Position[];
-  onClose: (type: 'LONG' | 'SHORT' | 'ALL') => void;
+  onClose: (type: 'LONG' | 'SHORT' | 'ALL' | string) => void; // 支持币种符号作为参数
   loading: boolean;
   walletBalance?: number;
   hasCredentials?: boolean;
@@ -75,21 +75,21 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
     >
       {/* Header & Stats */}
       <div className="p-3 md:p-6 border-b border-gray-200 space-y-3 md:space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+            <div className="hidden md:flex p-2.5 bg-indigo-50 text-indigo-600 rounded-xl flex-shrink-0">
               <Wallet className="w-5 h-5" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h2 className="hidden md:block text-lg font-bold text-gray-900">持仓管理</h2>
-              <p className="text-xs text-gray-600 font-medium space-x-3 mt-1">
+              <p className="text-xs text-gray-600 font-medium space-x-2 md:space-x-3 mt-1 whitespace-nowrap">
                 <span>多: <span className="font-bold text-green-600">{positions.filter(p => p.side === 'LONG').length}</span></span>
                 <span>空: <span className="font-bold text-red-600">{positions.filter(p => p.side === 'SHORT').length}</span></span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             {onRefresh && (
               <button
                 onClick={onRefresh}
@@ -100,12 +100,12 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
             )}
-            <div className="flex gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200">
+            <div className="flex gap-0.5 md:gap-1 bg-gray-100 p-0.5 md:p-1 rounded-lg md:rounded-xl border border-gray-200">
               {(['ALL', 'LONG', 'SHORT'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${activeTab === tab
+                  className={`px-2 md:px-3 py-1 md:py-1.5 text-xs font-bold rounded transition-all whitespace-nowrap ${activeTab === tab
                       ? 'bg-white text-indigo-700 shadow-sm border border-gray-100'
                       : 'text-gray-600 hover:text-gray-900'
                     }`}
@@ -234,7 +234,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         <button
-                          onClick={() => onClose(p.side)}
+                          onClick={() => onClose(p.symbol)}
                           disabled={loading}
                           className="p-2 rounded-lg transition-all disabled:opacity-50 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 inline-flex items-center justify-center"
                           title={`平${p.side === 'LONG' ? '多' : '空'}`}
@@ -286,7 +286,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                       </div>
                     </div>
                     <button
-                      onClick={() => onClose(p.side)}
+                      onClick={() => onClose(p.symbol)}
                       disabled={loading}
                       className="p-1.5 rounded-lg transition-all disabled:opacity-50 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 flex-shrink-0"
                       title={`平${p.side === 'LONG' ? '多' : '空'}`}

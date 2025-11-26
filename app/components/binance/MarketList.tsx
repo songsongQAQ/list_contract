@@ -59,8 +59,8 @@ export const MarketList: React.FC<MarketListProps> = ({
     return formatted;
   };
 
-  // 获取忽略的币种列表（优先使用传入的 prop，否则从 localStorage 读取）
-  const ignoredSymbolsStr = ignoredSymbols || (typeof window !== 'undefined' ? localStorage.getItem('ignored_symbols') || '' : '');
+  // 获取忽略的币种列表（使用传入的 prop）
+  const ignoredSymbolsStr = ignoredSymbols || '';
   const ignoredSet = new Set(
     ignoredSymbolsStr
       .split(/\s+/)
@@ -69,7 +69,11 @@ export const MarketList: React.FC<MarketListProps> = ({
   );
 
   const isSymbolIgnored = (symbol: string) => {
-    const cleanSymbol = symbol.replace('/USDT:USDT', '').replace('/USDT', '');
+    // 清理symbol，提取币名（例如 COAI/USDT:USDT -> COAI）
+    const cleanSymbol = symbol
+      .split('/')[0]
+      .split(':')[0]
+      .toUpperCase();
     return ignoredSet.has(cleanSymbol);
   };
 

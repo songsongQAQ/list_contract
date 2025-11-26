@@ -7,21 +7,40 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    let { symbols, side, leverage = 50, notional = 150, takeProfitPercent = 0, stopLossPercent = 0 } = body;
+    let { symbols, side } = body;
     
-    // Ensure all numeric values are actually numbers
-    leverage = parseFloat(leverage) || 50;
-    notional = parseFloat(notional) || 150;
-    takeProfitPercent = parseFloat(takeProfitPercent) || 0;
-    stopLossPercent = parseFloat(stopLossPercent) || 0;
+    // 从数据库获取用户配置（所有交易参数）
+    const userConfig = await getUserConfigFromDB();
+    
+    // 从用户配置中读取所有交易参数
+    const leverage = side === 'LONG'
+      ? parseFloat((userConfig as any)?.longLeverage || '50')
+      : parseFloat((userConfig as any)?.shortLeverage || '50');
+    
+    const margin = side === 'LONG'
+      ? parseFloat((userConfig as any)?.longMargin || '3')
+      : parseFloat((userConfig as any)?.shortMargin || '3');
+    
+    const notional = margin * leverage;
+    
+    // 解析止盈止损，确保空值被转换为 0
+    const takeProfitStr = (userConfig as any)?.takeProfit || '';
+    const stopLossStr = (userConfig as any)?.stopLoss || '';
+    const takeProfitPercent = takeProfitStr ? parseFloat(takeProfitStr) : 0;
+    const stopLossPercent = stopLossStr ? parseFloat(stopLossStr) : 0;
+    
+    // 检查是否为有效数字
+    const takeProfitValid = !isNaN(takeProfitPercent) ? takeProfitPercent : 0;
+    const stopLossValid = !isNaN(stopLossPercent) ? stopLossPercent : 0;
+    
+    console.log(`📊 交易请求参数 - 从数据库读取: leverage=${leverage}x, margin=${margin}U, notional=${notional}U, takeProfit=${takeProfitValid}%, stopLoss=${stopLossValid}%`);
     
     if (!symbols || !Array.isArray(symbols) || !side) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
     }
     
-    const credentials = await getUserConfigFromDB();
-
-    if (!credentials || !credentials.apiKey || !credentials.apiSecret) {
+    // 检查 API 凭证
+    if (!userConfig || !userConfig.apiKey || !userConfig.apiSecret) {
       console.error('No credentials found in database for trade');
       return NextResponse.json(
         { error: '请先在设置中配置 API 密钥' },
@@ -29,11 +48,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { apiKey, apiSecret } = credentials;
+    // ⚠️ 检查忽略列表，过滤掉已忽略的币种
+    const ignoredSymbolsStr = (userConfig as any)?.ignoredSymbols || '';
+    const ignoredSet = new Set(
+      ignoredSymbolsStr
+        .split(/\s+/)
+        .filter((s: string) => s.length > 0)
+        .map((s: string) => s.toUpperCase())
+    );
+    
+    const filteredSymbols = symbols.filter(symbol => {
+      const coinSymbol = symbol.split('/')[0].toUpperCase();
+      if (ignoredSet.has(coinSymbol)) {
+        console.log(`⏭️ 跳过已忽略的币种: ${symbol}`);
+        return false;
+      }
+      return true;
+    });
+    
+    if (filteredSymbols.length === 0) {
+      console.warn('所有币种都在忽略列表中');
+      return NextResponse.json({ 
+        results: symbols.map(s => ({ 
+          symbol: s, 
+          status: 'SKIPPED', 
+          message: '币种已忽略' 
+        }))
+      });
+    }
+    
+    console.log(`📊 交易币种过滤: 原始=${symbols.length}, 过滤后=${filteredSymbols.length}, 忽略列表=${Array.from(ignoredSet).join(',')}`);
+    symbols = filteredSymbols;
+
+    const { apiKey, apiSecret } = userConfig;
 
     console.log('Trade API - Using credentials:', { 
       apiKey: `${apiKey.substring(0, 8)}... (${apiKey.length} chars)`, 
-      mode: credentials.mode
+      mode: userConfig.mode
     });
     
     console.log(`Trade request: symbols=${symbols.length}, side=${side}, leverage=${leverage}, notional=${notional}`);
@@ -105,7 +156,7 @@ export async function POST(request: NextRequest) {
               console.log(`Successfully set leverage to ${tryLev}x for ${symbol}`);
               leverageSet = true;
               break;
-            } catch (tryError) {
+            } catch (_tryError) {
               console.log(`Leverage ${tryLev}x failed for ${symbol}, trying next...`);
               continue;
             }
@@ -125,13 +176,9 @@ export async function POST(request: NextRequest) {
         const price = ticker.last;
         if (!price) throw new Error('Could not fetch price');
 
-        // Get minimum notional requirement for this coin
-        // BTC default is 200, others default to 100
-        const coinSymbol = symbol.split('/')[0];
-        const defaultMinNotional = coinSymbol === 'BTC' ? 200 : 100;
-        
-        // Use the larger of: user configured notional or system default minimum
-        const baseNotional = Math.max(notional, defaultMinNotional);
+        // 使用用户配置的仓位价值
+        // 注：Binance 会自动检查最小仓位，如果不满足会返回错误
+        const baseNotional = notional;
         
         // But don't exceed 50% of account balance for safety
         const maxAllowed = accountBalance * 0.5;
@@ -144,7 +191,7 @@ export async function POST(request: NextRequest) {
           throw new Error(`Invalid quantity calculated: ${quantity} (notional: ${targetNotional}, price: ${price})`);
         }
         
-        console.log(`${symbol}: price=${price}, defaultMin=${defaultMinNotional}, configured=${notional}, using=${targetNotional}, quantity=${quantity}`);
+        console.log(`${symbol}: price=${price}, configured=${notional}, using=${targetNotional}, quantity=${quantity}`);
         
         // Get market limits to properly format quantity
         try {
@@ -195,34 +242,54 @@ export async function POST(request: NextRequest) {
         });
 
         // 5. Set Take Profit and Stop Loss if configured
-        if (takeProfitPercent > 0 || stopLossPercent > 0) {
+        // ⚠️ 根据实际杠杆计算实际本金（因为实际杠杆可能小于配置的杠杆）
+        const actualMargin = notional / actualLeverage;  // 实际本金 = 仓位价值 / 实际杠杆
+        console.log(`📊 准备设置止盈止损: takeProfit=${takeProfitValid}%, stopLoss=${stopLossValid}%, 配置本金=${margin}U, 实际本金=${actualMargin.toFixed(2)}U, 实际杠杆=${actualLeverage}x, quantity=${quantity}`);
+        
+        if (takeProfitValid > 0 || stopLossValid > 0) {
           try {
-            // Calculate TP and SL prices based on entry price
+            // Calculate TP and SL prices based on P&L percentage (not price percentage)
+            // 使用实际本金进行计算，因为实际杠杆可能与配置的杠杆不同
             let tpPrice = null;
             let slPrice = null;
             
             if (side === 'LONG') {
               // For LONG: TP is above entry, SL is below entry
-              if (takeProfitPercent > 0) {
-                tpPrice = price * (1 + takeProfitPercent / 100);
+              if (takeProfitValid > 0) {
+                // 目标利润 = 实际本金 * (1 + takeProfit/100)
+                const profitTarget = actualMargin * (1 + takeProfitValid / 100);
+                // 每张合约的目标利润 = 总利润 / 数量
+                const priceChange = (profitTarget - actualMargin) / quantity;
+                tpPrice = price + priceChange;
               }
-              if (stopLossPercent > 0) {
-                slPrice = price * (1 - stopLossPercent / 100);
+              if (stopLossValid > 0) {
+                // 亏损限额 = 实际本金 * (1 - stopLoss/100)
+                const lossLimit = actualMargin * (1 - stopLossValid / 100);
+                // 每张合约的亏损 = 实际本金 - 亏损限额 / 数量
+                const priceChange = (actualMargin - lossLimit) / quantity;
+                slPrice = price - priceChange;
               }
             } else {
               // For SHORT: TP is below entry, SL is above entry
-              if (takeProfitPercent > 0) {
-                tpPrice = price * (1 - takeProfitPercent / 100);
+              if (takeProfitValid > 0) {
+                const profitTarget = actualMargin * (1 + takeProfitValid / 100);
+                const priceChange = (profitTarget - actualMargin) / quantity;
+                tpPrice = price - priceChange;
               }
-              if (stopLossPercent > 0) {
-                slPrice = price * (1 + stopLossPercent / 100);
+              if (stopLossValid > 0) {
+                const lossLimit = actualMargin * (1 - stopLossValid / 100);
+                const priceChange = (actualMargin - lossLimit) / quantity;
+                slPrice = price + priceChange;
               }
             }
+
+            console.log(`📊 计算出的TP/SL价格: tpPrice=${tpPrice?.toFixed(4)}, slPrice=${slPrice?.toFixed(4)}, side=${side}, entry=${price.toFixed(4)}, 实际本金=${actualMargin.toFixed(2)}U`);
 
             // Place Take Profit order if configured
             if (tpPrice) {
               const tpSide = side === 'LONG' ? 'sell' : 'buy';
               try {
+                console.log(`正在设置TP订单: ${symbol} ${tpSide} ${quantity} @ ${tpPrice.toFixed(4)}`);
                 await client.createOrder(symbol, 'TAKE_PROFIT_MARKET', tpSide, quantity, undefined, {
                   positionSide: side,
                   stopPrice: tpPrice,
@@ -232,12 +299,15 @@ export async function POST(request: NextRequest) {
               } catch (tpError: any) {
                 console.warn(`✗ Failed to set TP for ${symbol}:`, tpError.message);
               }
+            } else {
+              console.log(`⏭️ 跳过TP订单设置 (takeProfitValid=${takeProfitValid})`);
             }
 
             // Place Stop Loss order if configured
             if (slPrice) {
               const slSide = side === 'LONG' ? 'sell' : 'buy';
               try {
+                console.log(`正在设置SL订单: ${symbol} ${slSide} ${quantity} @ ${slPrice.toFixed(4)}`);
                 await client.createOrder(symbol, 'STOP_MARKET', slSide, quantity, undefined, {
                   positionSide: side,
                   stopPrice: slPrice,
@@ -247,16 +317,78 @@ export async function POST(request: NextRequest) {
               } catch (slError: any) {
                 console.warn(`✗ Failed to set SL for ${symbol}:`, slError.message);
               }
+            } else {
+              console.log(`⏭️ 跳过SL订单设置 (stopLossValid=${stopLossValid})`);
             }
           } catch (tpslError: any) {
             console.warn(`Error setting TP/SL for ${symbol}:`, tpslError.message);
           }
+        } else {
+          console.log(`⏭️ 跳过TP/SL设置: takeProfit=${takeProfitValid}%, stopLoss=${stopLossValid}%`);
         }
 
         results.push({ symbol, status: 'SUCCESS', orderId: order.id });
       } catch (error: any) {
-        console.error(`Error trading ${symbol}:`, error);
-        results.push({ symbol, status: 'FAILED', message: error.message });
+        console.error(`Error trading ${symbol}:`, error.message);
+        
+        // 如果开仓失败且是因为仓位不足，尝试增加 50U 仓位后重试
+        if (error.message && (error.message.includes('notional') || error.message.includes('Minimum') || error.message.includes('precision'))) {
+          console.log(`⚠️ ${symbol}: 开仓失败，尝试增加 50U 仓位后重试...`);
+          
+          try {
+            // 重新获取价格和计算新的仓位
+            const retryTicker = await client.fetchTicker(symbol);
+            const retryPrice = retryTicker.last;
+            if (!retryPrice) throw new Error('Could not fetch retry price');
+            
+            // 增加 50U 仓位重试
+            const coinSymbol = symbol.split('/')[0];
+            const defaultMinNotional = coinSymbol === 'BTC' ? 200 : 100;
+            const retryBaseNotional = Math.max(notional + 50, defaultMinNotional); // 增加 50U
+            const maxAllowed = accountBalance * 0.5;
+            const retryTargetNotional = Math.min(retryBaseNotional, maxAllowed);
+            let retryQuantity = retryTargetNotional / retryPrice;
+            
+            console.log(`Retry with increased notional: ${retryTargetNotional} USDT`);
+            
+            // 重新应用市场限制
+            try {
+              const market = client.market(symbol);
+              if (market && market.limits) {
+                const { amount, cost } = market.limits;
+                
+                if (amount && amount.min && retryQuantity < amount.min) {
+                  retryQuantity = amount.min;
+                }
+                if (cost && cost.min && (retryQuantity * retryPrice) < cost.min) {
+                  retryQuantity = cost.min / retryPrice;
+                }
+                
+                const amountAny = amount as any;
+                if (amountAny && amountAny.precision) {
+                  retryQuantity = parseFloat(retryQuantity.toPrecision(amountAny.precision));
+                }
+              }
+            } catch (_e) {
+              console.warn(`Could not fetch market limits for retry ${symbol}`);
+            }
+            
+            const retryOrderSide = side === 'LONG' ? 'buy' : 'sell';
+            console.log(`Retry order: ${symbol} qty=${retryQuantity} price=${retryPrice}`);
+            
+            const retryOrder = await client.createMarketOrder(symbol, retryOrderSide, retryQuantity, undefined, {
+              positionSide: side
+            });
+            
+            console.log(`✓ Retry successful for ${symbol}`);
+            results.push({ symbol, status: 'SUCCESS', orderId: retryOrder.id, message: '增加仓位后成功' });
+          } catch (retryError: any) {
+            console.error(`Retry also failed for ${symbol}:`, retryError.message);
+            results.push({ symbol, status: 'FAILED', message: `首次失败: ${error.message}, 重试也失败: ${retryError.message}` });
+          }
+        } else {
+          results.push({ symbol, status: 'FAILED', message: error.message });
+        }
       }
     }
 

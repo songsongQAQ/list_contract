@@ -103,17 +103,6 @@ export default function BinancePage() {
     }).catch(console.error);
   };
 
-  // 在客户端挂载后从 localStorage 读取 limit 和带单模式
-  useEffect(() => {
-    const saved = localStorage.getItem('default_limit');
-    if (saved) {
-      setLimit(parseInt(saved));
-    }
-    const copytrading = localStorage.getItem('copytrading_mode');
-    if (copytrading) {
-      setCopytradingMode(copytrading === 'true');
-    }
-  }, []);
   
   // Loading States for Lists
   const [marketLoading, setMarketLoading] = useState(false);
@@ -293,12 +282,35 @@ export default function BinancePage() {
     try {
       // 市场数据不需要密钥，后端是公开 API
       const res = await fetch(`/api/binance/market?limit=${limit}`);
-      const data = await res.json();
+      
+      if (!res.ok) {
+        // 网络请求或服务器响应失败
+        let errorMsg = '未知错误';
+        try {
+          const data = await res.json();
+          errorMsg = data.error || `HTTP ${res.status}`;
+        } catch (e) {
+          // JSON 解析失败，使用 HTTP 状态码
+          errorMsg = `HTTP ${res.status}: ${res.statusText}`;
+        }
+        console.error(`❌ 获取市场数据失败: ${errorMsg}`);
+        return;
+      }
+      
+      // 响应成功，解析 JSON
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        console.error('Failed to parse market data response JSON:', e);
+        return;
+      }
+      
       if (data.topMarket) {
         setMarketData(data);
       }
     } catch (error) {
-      console.error('Failed to fetch market data', error);
+      console.error('Failed to fetch market data:', error);
     } finally {
       setMarketLoading(false);
     }
@@ -309,24 +321,37 @@ export default function BinancePage() {
     try {
       // 检查是否有有效凭证
       if (!hasValidCredentials()) {
-        console.log('No valid credentials found for fetching positions');
         setPositions([]);
         setWalletBalance(0);
         setPositionsLoading(false);
         return;
       }
 
-      console.log('Fetching positions - backend will use user credentials from database via Session');
-
       // 持仓查询由后端通过 Session 识别用户并从数据库获取密钥
       const res = await fetch('/api/binance/positions');
       
-      const data = await res.json();
-      
-      // 如果响应失败，显示错误原因
       if (!res.ok) {
-        const errorMsg = data.error || '未知错误';
+        // 网络请求或服务器响应失败
+        let errorMsg = '未知错误';
+        try {
+          const data = await res.json();
+          errorMsg = data.error || `HTTP ${res.status}`;
+        } catch (e) {
+          // JSON 解析失败，使用 HTTP 状态码
+          errorMsg = `HTTP ${res.status}: ${res.statusText}`;
+        }
         console.error(`❌ 获取持仓失败: ${errorMsg}`);
+        setPositions([]);
+        setWalletBalance(0);
+        return;
+      }
+      
+      // 响应成功，解析 JSON
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        console.error('Failed to parse response JSON:', e);
         setPositions([]);
         setWalletBalance(0);
         return;
@@ -346,7 +371,10 @@ export default function BinancePage() {
         }
       }
     } catch (error) {
-      console.error('Failed to fetch positions', error);
+      console.error('Failed to fetch positions:', error);
+      // 确保在错误时也设置默认值
+      setPositions([]);
+      setWalletBalance(0);
     } finally {
       setPositionsLoading(false);
     }
@@ -440,8 +468,8 @@ export default function BinancePage() {
       targetList = '跌幅前';
     }
     
-    // 获取忽略的币种列表（优先从 userConfig 读取，否则从 localStorage 读取）
-    const ignoredSymbolsStr = userConfig?.ignoredSymbols || localStorage.getItem('ignored_symbols') || '';
+    // 获取忽略的币种列表（从 userConfig 读取）
+    const ignoredSymbolsStr = userConfig?.ignoredSymbols || '';
     const ignoredSet = new Set(
       ignoredSymbolsStr
         .split(/\s+/)
@@ -463,27 +491,8 @@ export default function BinancePage() {
       setCurrentTradeTotal(symbols.length);
       setTradeSide(side);
 
-      // 从 localStorage 读取交易设置
-      const leverage = side === 'LONG'
-        ? parseFloat(localStorage.getItem('trading_long_leverage') || '50')
-        : parseFloat(localStorage.getItem('trading_short_leverage') || '50');
-      
-      const margin = side === 'LONG'
-        ? parseFloat(localStorage.getItem('trading_long_margin') || '3')
-        : parseFloat(localStorage.getItem('trading_short_margin') || '3');
-      
-      // 计算仓位价值 = 本金 × 杠杆倍数
-      const notional = margin * leverage;
-      
-      // 从 localStorage 读取止盈止损设置（相对于本金的倍数）
-      const takeProfitMultiple = parseFloat(localStorage.getItem('take_profit_percent') || '0');
-      const stopLossMultiple = parseFloat(localStorage.getItem('stop_loss_percent') || '0');
-      
-      // 转换为相对于仓位价值的百分比
-      // 止盈/止损金额 = 本金 × (倍数 / 100)
-      // 百分比 = 金额 / 仓位价值 × 100
-      const takeProfitPercent = takeProfitMultiple > 0 ? (margin * takeProfitMultiple / 100) / notional * 100 : 0;
-      const stopLossPercent = stopLossMultiple > 0 ? (margin * stopLossMultiple / 100) / notional * 100 : 0;
+      // ✅ 前端只负责发送币种和方向，所有配置参数由后端从数据库读取
+      console.log(`📊 发起交易请求: 方向=${side}, 币种数量=${symbols.length}`);
 
       // 检查是否有凭证
       if (!hasValidCredentials()) {
@@ -547,7 +556,7 @@ export default function BinancePage() {
               headers: { 
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({ symbols: tradingSymbols, side, leverage, notional, takeProfitPercent, stopLossPercent })
+              body: JSON.stringify({ symbols: tradingSymbols, side })
             });
             
             const data = await res.json();
@@ -585,6 +594,8 @@ export default function BinancePage() {
       }
 
       setIsTrading(false);
+      // 确保进度显示为 100%
+      setTradeProgress(symbols.length);
       fetchPositions();
     };
 
@@ -616,27 +627,8 @@ export default function BinancePage() {
       setCurrentTradeTotal(1);
       setTradeSide(side);
 
-      // 从 localStorage 读取交易设置
-      const leverage = side === 'LONG'
-        ? parseFloat(localStorage.getItem('trading_long_leverage') || '50')
-        : parseFloat(localStorage.getItem('trading_short_leverage') || '50');
-      
-      const margin = side === 'LONG'
-        ? parseFloat(localStorage.getItem('trading_long_margin') || '3')
-        : parseFloat(localStorage.getItem('trading_short_margin') || '3');
-      
-      // 计算仓位价值 = 本金 × 杠杆倍数
-      const notional = margin * leverage;
-      
-      // 从 localStorage 读取止盈止损设置（相对于本金的倍数）
-      const takeProfitMultiple = parseFloat(localStorage.getItem('take_profit_percent') || '0');
-      const stopLossMultiple = parseFloat(localStorage.getItem('stop_loss_percent') || '0');
-      
-      // 转换为相对于仓位价值的百分比
-      // 止盈/止损金额 = 本金 × (倍数 / 100)
-      // 百分比 = 金额 / 仓位价值 × 100
-      const takeProfitPercent = takeProfitMultiple > 0 ? (margin * takeProfitMultiple / 100) / notional * 100 : 0;
-      const stopLossPercent = stopLossMultiple > 0 ? (margin * stopLossMultiple / 100) / notional * 100 : 0;
+      // ✅ 前端只负责发送币种和方向，所有配置参数由后端从数据库读取
+      console.log(`📊 发起一键交易: 币种=${symbol}, 方向=${side}`);
 
       // 检查是否有凭证
       if (!hasValidCredentials()) {
@@ -655,7 +647,7 @@ export default function BinancePage() {
           headers: { 
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ symbols: [symbol], side, leverage, notional, takeProfitPercent, stopLossPercent })
+          body: JSON.stringify({ symbols: [symbol], side })
         });
         
         const data = await res.json();
@@ -678,10 +670,12 @@ export default function BinancePage() {
           message: e instanceof Error ? e.message : '网络错误' 
         }]);
         setTradeProgress(1);
+      } finally {
+        setIsTrading(false);
+        // 确保进度显示为 100%
+        setTradeProgress(1);
+        fetchPositions();
       }
-
-      setIsTrading(false);
-      fetchPositions();
     };
 
     setConfirmData({
@@ -694,15 +688,49 @@ export default function BinancePage() {
     setConfirmOpen(true);
   };
 
-  const handleClosePositions = async (type: 'LONG' | 'SHORT' | 'ALL') => {
-    const typeText = type === 'LONG' ? '多单' : type === 'SHORT' ? '空单' : '所有持仓';
+  const handleClosePositions = async (type: 'LONG' | 'SHORT' | 'ALL' | string) => {
+    // 判断是否是平单个币种
+    const isSingleSymbol = !['LONG', 'SHORT', 'ALL'].includes(type);
+    
+    let typeText = '';
+    if (isSingleSymbol) {
+      typeText = `${type}`;
+    } else {
+      typeText = type === 'LONG' ? '多单' : type === 'SHORT' ? '空单' : '所有持仓';
+    }
+    
+    // 首先计算需要平仓的仓位（确认弹窗前就计算）
+    const positionsToClose = positions.filter((p: any) => {
+      if (isSingleSymbol) {
+        // 平单个币种
+        return p.symbol === type;
+      } else if (type === 'ALL') {
+        return true;
+      } else {
+        // 平所有该方向的仓位
+        return type === p.side;
+      }
+    });
+    
+    // 如果没有需要平仓的仓位，直接显示提示
+    if (positionsToClose.length === 0) {
+      setTradeResults([{ symbol: 'N/A', status: 'SKIPPED', message: '没有需要平仓的仓位' }]);
+      setTradeModalOpen(true);
+      return;
+    }
     
     const executeClose = async () => {
       setIsTrading(true);
       setTradeModalOpen(true);
       setTradeResults([]);
       setTradeProgress(0);
-      if (type === 'ALL') {
+      
+      // 确定交易侧边
+      if (isSingleSymbol) {
+        // 平单个币种
+        const singlePos = positionsToClose[0];
+        setTradeSide(singlePos.side === 'LONG' ? 'CLOSE_LONG' : 'CLOSE_SHORT');
+      } else if (type === 'ALL') {
         setTradeSide('CLOSE_ALL');
       } else if (type === 'LONG') {
         setTradeSide('CLOSE_LONG');
@@ -710,13 +738,9 @@ export default function BinancePage() {
         setTradeSide('CLOSE_SHORT');
       }
       
-      // 计算需要平仓的仓位
-      const positionsToClose = positions.filter((p: any) => {
-        if (type === 'ALL') return true;
-        const side = parseFloat(p.size) > 0 ? 'LONG' : 'SHORT';
-        return type === side;
-      });
+      // 设置总数
       setCurrentTradeTotal(positionsToClose.length);
+      console.log(`📊 需要平仓的仓位: ${positionsToClose.length}`, positionsToClose);
 
       // 检查是否有凭证
       if (!hasValidCredentials()) {
@@ -787,6 +811,8 @@ export default function BinancePage() {
         }]);
       } finally {
         setIsTrading(false);
+        // 确保进度显示为 100%
+        setTradeProgress(positionsToClose.length);
       }
     };
 
@@ -1029,6 +1055,7 @@ export default function BinancePage() {
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
                   onOpenPosition={handleOpenPosition}
+                  ignoredSymbols={userConfig?.ignoredSymbols || ''}
                 />
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">
@@ -1045,6 +1072,7 @@ export default function BinancePage() {
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
                   onOpenPosition={handleOpenPosition}
+                  ignoredSymbols={userConfig?.ignoredSymbols || ''}
                 />
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">
@@ -1061,6 +1089,7 @@ export default function BinancePage() {
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
                   onOpenPosition={handleOpenPosition}
+                  ignoredSymbols={userConfig?.ignoredSymbols || ''}
                 />
               </div>
             </div>
@@ -1174,7 +1203,7 @@ export default function BinancePage() {
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
                   onOpenPosition={handleOpenPosition}
-                  ignoredSymbols={userConfig?.ignoredSymbols || localStorage.getItem('ignored_symbols') || ''}
+                  ignoredSymbols={userConfig?.ignoredSymbols || ''}
                 />
               </div>
             )}
@@ -1195,7 +1224,7 @@ export default function BinancePage() {
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
                   onOpenPosition={handleOpenPosition}
-                  ignoredSymbols={userConfig?.ignoredSymbols || localStorage.getItem('ignored_symbols') || ''}
+                  ignoredSymbols={userConfig?.ignoredSymbols || ''}
                 />
               </div>
             )}
@@ -1216,7 +1245,7 @@ export default function BinancePage() {
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
                   onOpenPosition={handleOpenPosition}
-                  ignoredSymbols={userConfig?.ignoredSymbols || localStorage.getItem('ignored_symbols') || ''}
+                  ignoredSymbols={userConfig?.ignoredSymbols || ''}
                 />
               </div>
             )}

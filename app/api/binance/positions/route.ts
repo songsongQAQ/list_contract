@@ -6,14 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('[Positions API] 开始获取用户配置...');
     const credentials = await getUserConfigFromDB();
-    console.log('[Positions API] 用户配置获取结果:', {
-      hasCredentials: !!credentials,
-      hasApiKey: !!(credentials?.apiKey),
-      hasApiSecret: !!(credentials?.apiSecret),
-      mode: credentials?.mode,
-    });
 
     if (!credentials || !credentials.apiKey || !credentials.apiSecret) {
       console.error('[Positions API] 未找到凭证:', {
@@ -46,31 +39,11 @@ export async function GET(request: NextRequest) {
     // 验证 API Key 格式（Binance API Key 通常是 64 个字符）
     const keyLength = apiKey.length;
     const secretLength = apiSecret.length;
-    console.log('[Positions API] 使用凭证:', { 
-      apiKey: `${apiKey.substring(0, 8)}... (${keyLength} chars)`, 
-      apiSecret: `${apiSecret.substring(0, 8)}... (${secretLength} chars)`,
-      mode: credentials.mode,
-      keyFormatValid: keyLength >= 32 && keyLength <= 128, // Binance API Key 长度通常在 32-128 之间
-      secretFormatValid: secretLength >= 32 && secretLength <= 128,
-    });
-
-    // 如果 API Key 长度异常，记录警告
-    if (keyLength < 32 || keyLength > 128) {
-      console.warn('[Positions API] ⚠️ API Key 长度异常:', keyLength, '（正常范围：32-128）');
-    }
-    if (secretLength < 32 || secretLength > 128) {
-      console.warn('[Positions API] ⚠️ API Secret 长度异常:', secretLength, '（正常范围：32-128）');
-    }
-
-    console.log('[Positions API] 创建 Binance 客户端...');
+    // 创建 Binance 客户端并验证 API Key
     const client = await getBinanceClient(apiKey, apiSecret, true);
-    console.log('[Positions API] Binance 客户端创建成功');
     
-    // 先验证 API Key 是否有效 - 使用一个简单的 API 调用
     try {
-      console.log('[Positions API] 验证 API Key 有效性...');
       await client.fetchBalance();
-      console.log('[Positions API] API Key 验证成功');
     } catch (authError: any) {
       console.error('[Positions API] API Key 验证失败:', {
         message: authError.message,
@@ -154,7 +127,6 @@ export async function GET(request: NextRequest) {
     
     usdtBalance = usdtBalance || 0;
     
-    console.log(`Fetching positions - wallet balance: ${usdtBalance} USDT, positions count: ${positions.length}`);
     
     const activePositions = await Promise.all(
       positions
@@ -202,7 +174,6 @@ export async function GET(request: NextRequest) {
             console.warn(`Failed to fetch open orders for ${p.symbol}:`, error);
           }
           
-          console.log(`${p.symbol}: size=${size}, leverage=${leverage.toFixed(2)}, notional=${positionNotional.toFixed(2)}, margin=${margin.toFixed(2)}, TP=${takeProfitPrice}, SL=${stopLossPrice}`);
           
           return {
             symbol: p.symbol,
@@ -220,7 +191,6 @@ export async function GET(request: NextRequest) {
         })
     );
 
-    console.log('[Positions API] 返回结果，活跃持仓数:', activePositions.length);
     return NextResponse.json({ positions: activePositions, walletBalance: usdtBalance });
   } catch (error: any) {
     console.error('[Positions API] 错误详情:', {
@@ -290,15 +260,14 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type'); // 'LONG', 'SHORT', or 'ALL'
-    
     let body: any = {};
     try {
       body = await request.json();
     } catch (e) {
       // 如果没有body，继续处理
     }
+
+    console.log('📊 平仓请求:', { symbols: body.symbols });
 
     const credentials = await getUserConfigFromDB();
 
@@ -318,11 +287,13 @@ export async function DELETE(request: NextRequest) {
 
     const results = [];
     
-    // 如果指定了symbols列表，只平仓这些币种
+    // 前端发送的目标币种列表
     const targetSymbols = body.symbols ? new Set(body.symbols) : null;
 
+    console.log(`平仓操作: 目标币种=${JSON.stringify(Array.from(targetSymbols || []))}, 活跃持仓数=${activePositions.length}`);
+
     for (const p of activePositions) {
-      // 如果指定了目标币种列表，检查是否包含该币种
+      // 如果指定了目标币种列表，只平仓这些币种
       if (targetSymbols && !targetSymbols.has(p.symbol)) {
         continue;
       }
@@ -330,19 +301,18 @@ export async function DELETE(request: NextRequest) {
       const size = parseFloat(p.info.positionAmt);
       const side = size > 0 ? 'LONG' : 'SHORT';
 
-      if (type === 'ALL' || type === side) {
-        try {
-          // Close by sending opposite order with positionSide parameter
-          const orderSide = size > 0 ? 'sell' : 'buy';
-          // Use Math.abs for size because createMarketOrder expects positive quantity
-          // positionSide is required for Binance to know which position to close (LONG or SHORT)
-          await client.createMarketOrder(p.symbol, orderSide, Math.abs(size), undefined, { 
-            positionSide: side
-          });
-          results.push({ symbol: p.symbol, status: 'SUCCESS' });
-        } catch (e: any) {
-          results.push({ symbol: p.symbol, status: 'FAILED', message: e.message });
-        }
+      try {
+        // Close by sending opposite order with positionSide parameter
+        const orderSide = size > 0 ? 'sell' : 'buy';
+        // Use Math.abs for size because createMarketOrder expects positive quantity
+        // positionSide is required for Binance to know which position to close (LONG or SHORT)
+        await client.createMarketOrder(p.symbol, orderSide, Math.abs(size), undefined, { 
+          positionSide: side
+        });
+        results.push({ symbol: p.symbol, status: 'SUCCESS' });
+      } catch (e: any) {
+        console.error(`❌ 平仓失败: ${p.symbol} - ${e.message}`);
+        results.push({ symbol: p.symbol, status: 'FAILED', message: e.message });
       }
     }
 
