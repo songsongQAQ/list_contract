@@ -13,6 +13,7 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [saving, setSaving] = useState(false);
+  const [serverIP, setServerIP] = useState<string>('127.0.0.1');
   
   // 交易设置状态
   const [settings, setSettings] = useState({
@@ -34,8 +35,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   useEffect(() => {
     if (isOpen) {
       fetchSettings();
+      fetchServerIP();
     }
   }, [isOpen]);
+
+  const fetchServerIP = async () => {
+    try {
+      const res = await fetch('/api/server/config');
+      if (res.ok) {
+        const data = await res.json();
+        setServerIP(data.serverIP || '127.0.0.1');
+      }
+    } catch (error) {
+      console.error('Failed to fetch server IP:', error);
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -243,12 +257,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                               <p className="text-xs text-red-700 font-bold">⚠️ 请将 <button 
                                 type="button"
                                 onClick={() => {
-                                  navigator.clipboard.writeText('43.159.227.33');
+                                  navigator.clipboard.writeText(serverIP);
                                   message.success('✓ IP地址已复制到剪贴板！');
                                 }}
                                 className="font-mono font-bold text-red-800 hover:text-red-900 underline decoration-dotted cursor-pointer transition-colors"
-                              >43.159.227.33</button> 设置白名单</p>
-                              <p className="text-xs text-red-700 font-bold">⚠️ 请勿分享给任何人。密钥保存在本地浏览器中。</p>
+                              >{serverIP}</button> 设置白名单</p>
+                              <p className="text-xs text-red-700 font-bold">⚠️ 请勿分享给任何人。</p>
                             </div>
                             <div className="space-y-2">
                               <label className="text-xs font-bold text-gray-600">带单 API Key</label>
@@ -307,12 +321,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                       <p className="text-xs text-red-700 font-bold">⚠️ 请将 <button 
                         type="button"
                         onClick={() => {
-                          navigator.clipboard.writeText('43.159.227.33');
+                          navigator.clipboard.writeText(serverIP);
                           message.success('✓ IP地址已复制到剪贴板！');
                         }}
                         className="font-mono font-bold text-red-800 hover:text-red-900 underline decoration-dotted cursor-pointer transition-colors"
-                      >43.159.227.33</button> 设置白名单</p>
-                      <p className="text-xs text-red-700 font-bold">⚠️ 请勿分享给任何人。密钥保存在本地浏览器中。</p>
+                      >{serverIP}</button> 设置白名单</p>
+                      <p className="text-xs text-red-700 font-bold">⚠️ 请勿分享给任何人。</p>
                     </div>
                     <div className="space-y-3">
                       <div className="space-y-2">

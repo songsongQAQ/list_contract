@@ -200,6 +200,11 @@ NEXTAUTH_URL=http://localhost:3000
 ADMIN_PASSWORD=your_admin_password
 # 用于访问后台管理页面的密码
 
+# ==================== 服务器配置（可选）====================
+SERVER_IP=your_server_ip_address
+# 用于 Binance API 白名单配置，默认值为 '127.0.0.1'
+# 示例: SERVER_IP="43.159.227.33"
+
 # ==================== Binance API 配置（可选）====================
 # 可在应用内设置，或预先配置
 BINANCE_API_KEY=your_binance_api_key
@@ -294,6 +299,29 @@ npm run dev
 BINANCE_API_KEY=your_key
 BINANCE_API_SECRET=your_secret
 ```
+
+### IP 白名单配置
+
+应用在设置界面中会显示服务器 IP 地址，您需要将该 IP 添加到 Binance API 白名单。
+
+**配置步骤**：
+
+1. 在应用设置界面中可以看到服务器 IP 地址（点击即可复制）
+2. 访问 [Binance API 管理](https://www.binance.com/en/account/api-management)
+3. 在对应的 API Key 配置中，找到"IP 白名单"设置
+4. 将应用显示的 IP 地址添加到白名单中
+5. 保存配置
+
+**通过环境变量配置服务器 IP**：
+
+默认情况下，应用会自动使用服务器的 IP 地址。您也可以通过环境变量 `SERVER_IP` 手动指定：
+
+```env
+SERVER_IP=43.159.227.33
+```
+
+- 如果不设置，应用将使用默认值 `127.0.0.1`
+- 在生产环境中，强烈建议显式设置此值为您的服务器实际 IP 地址
 
 ### 🔒 安全建议
 
