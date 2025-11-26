@@ -81,7 +81,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
               <Wallet className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">持仓管理</h2>
+              <h2 className="hidden md:block text-lg font-bold text-gray-900">持仓管理</h2>
               <p className="text-xs text-gray-600 font-medium space-x-3 mt-1">
                 <span>多: <span className="font-bold text-green-600">{positions.filter(p => p.side === 'LONG').length}</span></span>
                 <span>空: <span className="font-bold text-red-600">{positions.filter(p => p.side === 'SHORT').length}</span></span>

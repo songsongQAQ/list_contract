@@ -843,16 +843,10 @@ export default function BinancePage() {
             </div>
           </div>
 
-          {/* Mobile: Show Icon Only */}
-          <div className="md:hidden">
-            <div className="p-2 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-200">
-              <Activity className="w-6 h-6 text-white" />
-            </div>
-          </div>
-
-          {/* Account Status Display - Center of Header */}
+          {/* Mobile: Show Account Status on Left */}
+          {/* Account Status Display - Left on Mobile, Center on Desktop */}
           {isHydrated && (
-            <div className="flex items-center gap-2">
+            <div className="md:hidden flex items-center gap-2">
               {displayLoggedIn ? (
                 <>
                   {hasUserConfig && (
@@ -866,11 +860,38 @@ export default function BinancePage() {
                       }`}
                       title={copytradingMode ? '正在使用带单账户' : '正在使用主账户'}
                     >
-                      <span className="relative flex h-1.5 w-1.5">
-                        <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-600"></span>
-                      </span>
-                      <span>{copytradingMode ? '带单账户' : '主账户'}</span>
+                      <span>{copytradingMode ? '带单账户' : '主账户'} - {walletBalance.toFixed(2)}</span>
+                    </motion.div>
+                  )}
+                </>
+              ) : (
+                <button
+                  onClick={() => setLoginOpen(true)}
+                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+                >
+                  去登录
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Account Status Display - Center on Desktop */}
+          {isHydrated && (
+            <div className="hidden md:flex items-center gap-2">
+              {displayLoggedIn ? (
+                <>
+                  {hasUserConfig && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-sm text-xs font-bold ${
+                        copytradingMode
+                          ? 'bg-green-50 text-green-700 border-green-200/50'
+                          : 'bg-blue-50 text-blue-700 border-blue-200/50'
+                      }`}
+                      title={copytradingMode ? '正在使用带单账户' : '正在使用主账户'}
+                    >
+                      <span>{copytradingMode ? '带单账户' : '主账户'} - {walletBalance.toFixed(2)}</span>
                     </motion.div>
                   )}
                 </>
@@ -889,7 +910,6 @@ export default function BinancePage() {
           {isHydrated && displayLoggedIn && (
             <div className="hidden md:flex items-center gap-2 bg-gray-100/50 px-2 py-1 rounded-xl border border-gray-200/50">
               <div className="flex items-center gap-2 px-2">
-                <span className="text-gray-600 font-bold text-xs">Top:</span>
                 <select 
                   value={limit} 
                   onChange={(e) => handleLimitChange(Number(e.target.value))}
@@ -926,7 +946,6 @@ export default function BinancePage() {
           {isHydrated && displayLoggedIn && (
             <div className="md:hidden flex items-center gap-2 bg-gray-100/50 px-2 py-1 rounded-xl border border-gray-200/50">
               <div className="flex items-center gap-2 px-2">
-                <span className="text-gray-600 font-bold text-xs">Top:</span>
                 <select 
                   value={limit} 
                   onChange={(e) => handleLimitChange(Number(e.target.value))}

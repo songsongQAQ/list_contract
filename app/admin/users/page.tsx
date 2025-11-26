@@ -338,7 +338,7 @@ export default function AdminUsersPage() {
         }}
         okText="确定"
         cancelText="取消"
-        destroyOnClose
+        destroyOnHidden
       >
         {modalVisible && (
           <Form form={form} layout="vertical">
@@ -376,7 +376,7 @@ export default function AdminUsersPage() {
         okText="保存"
         cancelText="取消"
         width={800}
-        destroyOnClose
+        destroyOnHidden
       >
         {configModalVisible && (
           <Form form={configForm} layout="vertical" className="max-h-[60vh] overflow-y-auto">

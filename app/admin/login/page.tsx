@@ -23,6 +23,7 @@ export default function AdminLoginPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ password }),
+        credentials: 'include', // 确保包含 cookie
       });
 
       const data = await res.json();
@@ -30,15 +31,19 @@ export default function AdminLoginPage() {
       if (!res.ok) {
         setError(data.error || '登录失败');
         setLoading(false);
+        console.error('Login failed:', data);
         return;
       }
 
-      // 登录成功，跳转到用户管理页面
-      router.push('/admin/users');
+      console.log('Login successful, redirecting to users page');
+      // 登录成功，使用 window.location.href 进行跳转以确保 cookie 被正确发送
+      // 添加小延迟确保 cookie 已被设置
+      setTimeout(() => {
+        window.location.href = '/admin/users';
+      }, 300);
     } catch (err) {
       setError('登录失败，请重试');
       console.error('Login error:', err);
-    } finally {
       setLoading(false);
     }
   };

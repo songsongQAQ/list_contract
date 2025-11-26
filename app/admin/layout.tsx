@@ -3,8 +3,6 @@
 import React, { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Users, LogOut, Home, Menu, X } from 'lucide-react';
-import { ConfigProvider } from 'antd';
-import zhCN from 'antd/locale/zh_CN';
 
 export default function AdminLayout({
   children,
@@ -17,7 +15,7 @@ export default function AdminLayout({
 
   // 如果是 /admin 根路径或登录页面，不显示 layout
   if (pathname === '/admin' || pathname === '/admin/login') {
-    return <>{children}</>;
+    return children;
   }
 
   const handleLogout = async () => {
@@ -43,8 +41,7 @@ export default function AdminLayout({
   ];
 
   return (
-    <ConfigProvider locale={zhCN}>
-      <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex">
         {/* 左侧导航栏 */}
         <aside
           className={`bg-white border-r border-gray-200 transition-all duration-300 ${
@@ -116,7 +113,6 @@ export default function AdminLayout({
           </main>
         </div>
       </div>
-    </ConfigProvider>
   );
 }
 

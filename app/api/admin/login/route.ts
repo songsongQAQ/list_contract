@@ -29,15 +29,27 @@ export async function POST(request: NextRequest) {
 
     // 登录成功，设置 cookie
     const cookieStore = await cookies();
+    
+    // 根据协议判断是否使用 secure
+    // 如果是 HTTP 环境，secure 必须为 false，否则 cookie 无法被保存
+    const isSecure = request.nextUrl.protocol === 'https:' || process.env.NODE_ENV !== 'production';
+    
     cookieStore.set('admin-auth', 'true', {
       httpOnly: false, // 允许前端读取，用于前端鉴权检查
-      secure: process.env.NODE_ENV === 'production',
+      secure: isSecure, // 仅在 HTTPS 或非生产环境使用 secure
       maxAge: 60 * 60 * 24 * 7, // 7天有效期
       path: '/',
-      sameSite: 'lax',
+      sameSite: 'lax', // 跨站请求时允许发送 cookie
     });
 
-    console.log('Admin login successful, cookie set.');
+    console.log('Admin login successful, cookie set:', {
+      adminAuth: 'true',
+      maxAge: 60 * 60 * 24 * 7,
+      secure: isSecure,
+      protocol: request.nextUrl.protocol,
+      nodeEnv: process.env.NODE_ENV,
+    });
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Admin login error:', error);
