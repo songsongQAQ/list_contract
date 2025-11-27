@@ -9,9 +9,10 @@ import { userConfigStorage } from '@/lib/storage';
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  currentLimit?: number; // 当前的分页设置
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentLimit = 10 }) => {
   const [saving, setSaving] = useState(false);
   const [serverIP, setServerIP] = useState<string>('127.0.0.1');
   
@@ -122,7 +123,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         }
       }
 
-      // 保存到数据库
+      // 保存到数据库 - 提交所有配置包括分页信息
       const res = await fetch('/api/user/config', {
         method: 'POST',
         headers: {
@@ -135,7 +136,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           longMargin: settings.longMargin,
           shortLeverage: settings.shortLeverage,
           shortMargin: settings.shortMargin,
-          defaultLimit: settings.defaultLimit,
+          defaultLimit: settings.defaultLimit, // 这里会有分页信息
           ignoredSymbols: settings.ignoredSymbols.trim(),
           takeProfit: settings.takeProfit,
           stopLoss: settings.stopLoss,
@@ -171,19 +172,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       };
       userConfigStorage.set(configToSave);
       
-      // 触发页面更新事件
+      // 触发页面更新事件，包含 credentialsUpdated 标志，触发凭证验证
       window.dispatchEvent(new CustomEvent('settingsChanged', {
         detail: {
           defaultLimit: settings.defaultLimit,
           copytradingMode: settings.copytradingMode,
-          credentialsUpdated: true
+          credentialsUpdated: true // 让页面重新检查凭证和数据
         }
       }));
       
       message.success('设置已保存！✓');
       
-      // 刷新页面以应用新设置
-      window.location.reload();
+      // 延迟关闭弹窗，不需要刷新整个页面
+      setTimeout(() => {
+        onClose();
+      }, 500);
     } catch (error) {
       console.error('Failed to save settings:', error);
       message.error('保存失败，请重试：' + (error instanceof Error ? error.message : '未知错误'));

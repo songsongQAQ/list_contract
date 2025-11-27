@@ -91,16 +91,35 @@ export default function BinancePage() {
   const [walletBalance, setWalletBalance] = useState(0);
   const [copytradingMode, setCopytradingMode] = useState(initialConfig?.copytradingMode ?? false);
 
-  // 处理 limit 变化
+  // 处理 limit 变化 - 获取完整配置后一起提交，避免其他配置被清空
   const handleLimitChange = (newLimit: number) => {
     setLimit(newLimit);
     console.log(`✓ Top 设置已更新为: ${newLimit}`);
-    // 保存到数据库
-    fetch('/api/user/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ defaultLimit: String(newLimit) }),
-    }).catch(console.error);
+    
+    // 获取当前缓存的完整配置
+    const cachedConfig = userConfigStorage.get();
+    if (cachedConfig) {
+      // 连同其他配置一起提交
+      fetch('/api/user/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: cachedConfig.apiKey || '',
+          apiSecret: cachedConfig.apiSecret || '',
+          longLeverage: cachedConfig.longLeverage || '50',
+          longMargin: cachedConfig.longMargin || '3',
+          shortLeverage: cachedConfig.shortLeverage || '50',
+          shortMargin: cachedConfig.shortMargin || '3',
+          defaultLimit: String(newLimit),
+          ignoredSymbols: cachedConfig.ignoredSymbols || '',
+          takeProfit: cachedConfig.takeProfit || '',
+          stopLoss: cachedConfig.stopLoss || '',
+          copytradingMode: cachedConfig.copytradingMode || false,
+          copytradingApiKey: cachedConfig.copytradingApiKey || '',
+          copytradingApiSecret: cachedConfig.copytradingApiSecret || '',
+        }),
+      }).catch(console.error);
+    }
   };
 
   
@@ -437,7 +456,10 @@ export default function BinancePage() {
       if (customEvent.detail && customEvent.detail.copytradingMode !== undefined) {
         setCopytradingMode(customEvent.detail.copytradingMode);
       }
-      // 页面重新加载会自动检查凭证
+      // 如果凭证已更新，重新检查配置和数据
+      if (customEvent.detail && customEvent.detail.credentialsUpdated) {
+        checkUserConfig();
+      }
     };
 
     window.addEventListener('settingsChanged', handleSettingsChanged);
@@ -1295,6 +1317,7 @@ export default function BinancePage() {
         />
         <SettingsModal 
           isOpen={settingsOpen} 
+          currentLimit={limit}
           onClose={() => {
             setSettingsOpen(false);
             checkUserConfig();
