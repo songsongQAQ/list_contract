@@ -27,6 +27,7 @@ interface MarketListProps {
   isLoading?: boolean;
   openPositions?: Set<string>;
   onOpenPosition?: (symbol: string, side: 'LONG' | 'SHORT') => void;
+  onAddMargin?: (symbol: string, side: 'LONG' | 'SHORT') => void;
   ignoredSymbols?: string; // 忽略的币种列表（空格分隔）
 }
 
@@ -43,6 +44,7 @@ export const MarketList: React.FC<MarketListProps> = ({
   isLoading = false,
   openPositions = new Set(),
   onOpenPosition,
+  onAddMargin,
   ignoredSymbols = ''
 }) => {
   const isLong = type === 'market' || type === 'loser';
@@ -160,9 +162,15 @@ export const MarketList: React.FC<MarketListProps> = ({
                     </div>
 
                     {isOpen ? (
-                      <span className="px-2 py-1 rounded-lg font-bold text-xs bg-green-50 text-green-600 whitespace-nowrap" title="已开仓">
-                        已开仓
-                      </span>
+                      <button
+                        onClick={() => onAddMargin?.(item.symbol, isLong ? 'LONG' : 'SHORT')}
+                        disabled={isTrading}
+                        className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-red-600 hover:bg-red-700"
+                        title={isTrading ? '交易进行中...' : '点击补仓'}
+                      >
+                        <Zap className="w-2.5 h-2.5 fill-white" />
+                        补仓
+                      </button>
                     ) : isSymbolIgnored(item.symbol) ? (
                       <span className="px-2 py-1 rounded-lg font-bold text-xs bg-gray-100 text-gray-500 whitespace-nowrap" title="已被添加到忽略列表">
                         已忽略
@@ -219,9 +227,15 @@ export const MarketList: React.FC<MarketListProps> = ({
                   </div>
 
                   {isOpen ? (
-                    <span className="px-3 py-1.5 rounded-lg font-bold text-sm bg-green-50 text-green-600" title="已开仓，不能重复开仓">
-                      已开仓
-                    </span>
+                    <button
+                      onClick={() => onAddMargin?.(item.symbol, isLong ? 'LONG' : 'SHORT')}
+                      disabled={isTrading}
+                      className="px-3 py-1.5 rounded-lg font-bold text-sm text-white flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 bg-red-600 hover:bg-red-700"
+                      title={isTrading ? '交易进行中...' : '点击补仓'}
+                    >
+                      <Zap className="w-3 h-3 fill-white" />
+                      补仓
+                    </button>
                   ) : isSymbolIgnored(item.symbol) ? (
                     <span className="px-3 py-1.5 rounded-lg font-bold text-sm bg-gray-100 text-gray-500" title="已被添加到忽略列表">
                       已忽略

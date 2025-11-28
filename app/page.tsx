@@ -710,6 +710,92 @@ export default function BinancePage() {
     setConfirmOpen(true);
   };
 
+  // 补仓处理函数
+  const handleAddMargin = async (symbol: string, side: 'LONG' | 'SHORT') => {
+    const sideText = side === 'LONG' ? '做多' : '做空';
+    
+    // 检查是否有该币种的持仓
+    const hasExistingPosition = positions.some(p => p.symbol === symbol);
+    if (!hasExistingPosition) {
+      setTradeResults([{ symbol, status: 'SKIPPED', message: '没有该币种的持仓' }]);
+      return;
+    }
+    
+    const executeAddMargin = async () => {
+      setIsTrading(true);
+      setTradeModalOpen(true);
+      setTradeResults([]);
+      setTradeProgress(0);
+      setCurrentTradeTotal(1);
+      setTradeSide(side);
+
+      console.log(`📊 发起补仓: 币种=${symbol}, 方向=${side}`);
+
+      // 检查是否有凭证
+      if (!hasValidCredentials()) {
+        console.error('No valid credentials for add margin');
+        setTradeResults([{ symbol, status: 'FAILED', message: '请先配置 API 密钥' }]);
+        setIsTrading(false);
+        return;
+      }
+
+      try {
+        console.log(`Adding margin to position: ${symbol}`);
+
+        // 调用补仓 API
+        const res = await fetch('/api/binance/add-margin', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ symbols: [symbol], side })
+        });
+        
+        const data = await res.json();
+        
+        // 如果响应失败，显示错误原因
+        if (!res.ok) {
+          const errorMsg = data.error || '未知错误';
+          console.error(`❌ 补仓失败: ${errorMsg}`);
+          setTradeResults([{ symbol, status: 'FAILED', message: errorMsg }]);
+        } else {
+          setTradeResults(data.results || []);
+        }
+        
+        setTradeProgress(1);
+      } catch (e) {
+        console.error(e);
+        setTradeResults([{ 
+          symbol, 
+          status: 'FAILED', 
+          message: e instanceof Error ? e.message : '网络错误' 
+        }]);
+        setTradeProgress(1);
+      } finally {
+        setIsTrading(false);
+        // 确保进度显示为 100%
+        setTradeProgress(1);
+        fetchPositions();
+      }
+    };
+
+    // 获取补仓金额信息（从现有的本金配置）
+    const cachedConfig = userConfigStorage.get();
+    const addMarginAmount = side === 'LONG'
+      ? parseFloat((cachedConfig?.longMargin || '3'))
+      : parseFloat((cachedConfig?.shortMargin || '3'));
+
+    setConfirmData({
+      title: '确认补仓',
+      message: `补仓将会大大增加爆仓的风险，是否确认对 ${symbol} 进行 ${sideText} 补仓？\n补仓金额: ${addMarginAmount} USDT`,
+      confirmText: '确定',
+      cancelText: '取消',
+      onConfirm: executeAddMargin,
+      isDangerous: true,
+    });
+    setConfirmOpen(true);
+  };
+
   const handleClosePositions = async (type: 'LONG' | 'SHORT' | 'ALL' | string) => {
     // 判断是否是平单个币种
     const isSingleSymbol = !['LONG', 'SHORT', 'ALL'].includes(type);
@@ -1077,6 +1163,7 @@ export default function BinancePage() {
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
                   onOpenPosition={handleOpenPosition}
+                  onAddMargin={handleAddMargin}
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
                 />
               </div>
@@ -1094,6 +1181,7 @@ export default function BinancePage() {
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
                   onOpenPosition={handleOpenPosition}
+                  onAddMargin={handleAddMargin}
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
                 />
               </div>
@@ -1111,6 +1199,7 @@ export default function BinancePage() {
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
                   onOpenPosition={handleOpenPosition}
+                  onAddMargin={handleAddMargin}
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
                 />
               </div>
@@ -1225,6 +1314,7 @@ export default function BinancePage() {
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
                   onOpenPosition={handleOpenPosition}
+                  onAddMargin={handleAddMargin}
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
                 />
               </div>
@@ -1246,6 +1336,7 @@ export default function BinancePage() {
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
                   onOpenPosition={handleOpenPosition}
+                  onAddMargin={handleAddMargin}
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
                 />
               </div>
@@ -1267,6 +1358,7 @@ export default function BinancePage() {
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
                   onOpenPosition={handleOpenPosition}
+                  onAddMargin={handleAddMargin}
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
                 />
               </div>

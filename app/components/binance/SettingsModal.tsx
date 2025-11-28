@@ -415,9 +415,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                           />
                           <span className="absolute right-4 top-2 text-gray-400 text-sm font-bold">x</span>
                         </div>
+                      </div>
                     </div>
                   </div>
-                </div>
 
                 <div className="h-px bg-gray-100" />
 
@@ -457,9 +457,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, c
                           />
                           <span className="absolute right-4 top-2 text-gray-400 text-sm font-bold">x</span>
                         </div>
+                      </div>
                     </div>
                   </div>
-                </div>
 
                 <div className="h-px bg-gray-100" />
 
