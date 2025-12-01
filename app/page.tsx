@@ -957,7 +957,7 @@ export default function BinancePage() {
         <div className="absolute bottom-[0%] left-[20%] w-[60%] h-[40%] rounded-full bg-pink-200/30 blur-3xl" />
       </div>
 
-      <div className="relative z-10 max-w-[1920px] mx-auto p-6 space-y-3 md:space-y-8">
+      <div className="relative z-10 max-w-[1920px] mx-auto p-4 space-y-3 md:space-y-8">
         {/* Header */}
         <motion.header 
           initial={{ y: -20, opacity: 0 }}
@@ -1151,8 +1151,8 @@ export default function BinancePage() {
             <div className="w-full flex gap-6 p-6" style={{ height: 'calc(100vh - 100px)' }}>
               <div className="flex-1 min-h-0 overflow-hidden">
                 <MarketList 
-                  title="市值 Top" 
-                  subtitle={`市值前 ${limit} 名`}
+                  title={`市值前 ${limit}`}
+                  subtitle=""
                   data={marketData.topMarket} 
                   type="market"
                   icon={<Layers className="w-5 h-5 text-blue-500" />}
@@ -1165,12 +1165,14 @@ export default function BinancePage() {
                   onOpenPosition={handleOpenPosition}
                   onAddMargin={handleAddMargin}
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
+                  positions={positions}
+                  onClosePosition={handleClosePositions}
                 />
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">
                 <MarketList 
-                  title="涨幅 Top" 
-                  subtitle={`24h 涨幅前 ${limit} 名`}
+                  title={`涨幅前 ${limit}`}
+                  subtitle=""
                   data={marketData.topGainers} 
                   type="gainer"
                   icon={<Activity className="w-5 h-5 text-pink-500" />}
@@ -1183,12 +1185,14 @@ export default function BinancePage() {
                   onOpenPosition={handleOpenPosition}
                   onAddMargin={handleAddMargin}
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
+                  positions={positions}
+                  onClosePosition={handleClosePositions}
                 />
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">
                 <MarketList 
-                  title="跌幅 Top" 
-                  subtitle={`24h 跌幅前 ${limit} 名`}
+                  title={`跌幅前 ${limit}`}
+                  subtitle=""
                   data={marketData.topLosers} 
                   type="loser"
                   icon={<TrendingDown className="w-5 h-5 text-orange-500" />}
@@ -1201,6 +1205,8 @@ export default function BinancePage() {
                   onOpenPosition={handleOpenPosition}
                   onAddMargin={handleAddMargin}
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
+                  positions={positions}
+                  onClosePosition={handleClosePositions}
                 />
               </div>
             </div>
@@ -1302,8 +1308,8 @@ export default function BinancePage() {
             {activeTab === 'marketCap' && (
               <div className="h-full w-full overflow-y-auto [&>div]:rounded-none! [&>div]:border-0! [&>div]:shadow-none! [&>div>div:first-child]:p-4! [&>div>div:last-child]:p-2!">
                 <MarketList 
-                  title="市值 Top" 
-                  subtitle={`市值前 ${limit} 名`}
+                  title={`市值前 ${limit}`}
+                  subtitle=""
                   data={marketData.topMarket} 
                   type="market"
                   icon={<Layers className="w-5 h-5 text-blue-500" />}
@@ -1316,6 +1322,8 @@ export default function BinancePage() {
                   onOpenPosition={handleOpenPosition}
                   onAddMargin={handleAddMargin}
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
+                  positions={positions}
+                  onClosePosition={handleClosePositions}
                 />
               </div>
             )}
@@ -1324,8 +1332,8 @@ export default function BinancePage() {
             {activeTab === 'gainers' && (
               <div className="h-full w-full overflow-y-auto [&>div]:rounded-none! [&>div]:border-0! [&>div]:shadow-none! [&>div>div:first-child]:p-4! [&>div>div:last-child]:p-2!">
                 <MarketList 
-                  title="涨幅 Top" 
-                  subtitle={`24h 涨幅前 ${limit} 名`}
+                  title={`涨幅前 ${limit}`}
+                  subtitle=""
                   data={marketData.topGainers} 
                   type="gainer"
                   icon={<TrendingUp className="w-5 h-5 text-pink-500" />}
@@ -1338,6 +1346,8 @@ export default function BinancePage() {
                   onOpenPosition={handleOpenPosition}
                   onAddMargin={handleAddMargin}
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
+                  positions={positions}
+                  onClosePosition={handleClosePositions}
                 />
               </div>
             )}
@@ -1346,8 +1356,8 @@ export default function BinancePage() {
             {activeTab === 'losers' && (
               <div className="h-full w-full overflow-y-auto [&>div]:rounded-none! [&>div]:border-0! [&>div]:shadow-none! [&>div>div:first-child]:p-4! [&>div>div:last-child]:p-2!">
                 <MarketList 
-                  title="跌幅 Top" 
-                  subtitle={`24h 跌幅前 ${limit} 名`}
+                  title={`跌幅前 ${limit}`}
+                  subtitle=""
                   data={marketData.topLosers} 
                   type="loser"
                   icon={<TrendingDown className="w-5 h-5 text-orange-500" />}
@@ -1360,6 +1370,8 @@ export default function BinancePage() {
                   onOpenPosition={handleOpenPosition}
                   onAddMargin={handleAddMargin}
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
+                  positions={positions}
+                  onClosePosition={handleClosePositions}
                 />
               </div>
             )}

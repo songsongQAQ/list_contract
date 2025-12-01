@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, DollarSign, Zap } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Zap, X } from 'lucide-react';
 
 interface MarketItem {
   symbol: string;
@@ -12,6 +12,20 @@ interface MarketItem {
   marketCap?: number;
   marketCapFormatted?: string;
   rank?: number;
+}
+
+interface Position {
+  symbol: string;
+  size: number;
+  entryPrice: number;
+  markPrice: number;
+  pnl: number;
+  side: 'LONG' | 'SHORT';
+  leverage: number;
+  positionNotional: number;
+  margin: number;
+  takeProfitPrice?: number | null;
+  stopLossPrice?: number | null;
 }
 
 interface MarketListProps {
@@ -29,6 +43,8 @@ interface MarketListProps {
   onOpenPosition?: (symbol: string, side: 'LONG' | 'SHORT') => void;
   onAddMargin?: (symbol: string, side: 'LONG' | 'SHORT') => void;
   ignoredSymbols?: string; // 忽略的币种列表（空格分隔）
+  positions?: Position[]; // 持仓列表
+  onClosePosition?: (symbol: string) => void; // 平仓回调
 }
 
 export const MarketList: React.FC<MarketListProps> = ({ 
@@ -45,7 +61,9 @@ export const MarketList: React.FC<MarketListProps> = ({
   openPositions = new Set(),
   onOpenPosition,
   onAddMargin,
-  ignoredSymbols = ''
+  ignoredSymbols = '',
+  positions = [],
+  onClosePosition
 }) => {
   const isLong = type === 'market' || type === 'loser';
   const isLoser = type === 'loser';
@@ -54,10 +72,15 @@ export const MarketList: React.FC<MarketListProps> = ({
   const borderColor = isLong ? 'border-green-100' : isLoser ? 'border-orange-100' : 'border-red-100';
   const buttonColor = isLong ? 'bg-green-600 hover:bg-green-700' : isLoser ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700';
 
-  // 格式化价格：最多展示四位小数，去掉末尾的0
+  // 根据 symbol 查找持仓
+  const getPositionBySymbol = (symbol: string) => {
+    return positions.find(p => p.symbol === symbol);
+  };
+
+  // 格式化价格：最多展示6位小数，去掉末尾的0
   const formatPrice = (price: number) => {
-    // 先格式化为4位小数，然后用parseFloat去掉末尾的0
-    const formatted = parseFloat(price.toFixed(4));
+    // 先格式化为6位小数，然后用parseFloat去掉末尾的0
+    const formatted = parseFloat(price.toFixed(6));
     return formatted;
   };
 
@@ -131,6 +154,9 @@ export const MarketList: React.FC<MarketListProps> = ({
       <div className="overflow-y-auto p-3 md:p-4 space-y-2 md:space-y-3 flex-1 custom-scrollbar">
         {data.map((item, index) => {
           const isOpen = openPositions.has(item.symbol);
+          const position = getPositionBySymbol(item.symbol);
+          const hasPosition = !!position;
+
           return (
             <motion.div
               key={item.symbol}
@@ -154,10 +180,18 @@ export const MarketList: React.FC<MarketListProps> = ({
                       <div className="text-xs text-gray-500 font-medium mt-0.5">
                         ${formatPrice(parseFloat(item.price.toString()))}
                       </div>
-                      {type === 'market' && item.marketCapFormatted ? (
-                        <div className="text-xs text-gray-400 mt-0.5">市值: ${item.marketCapFormatted}</div>
+                      {hasPosition ? (
+                        <div className={`text-xs font-bold mt-0.5 ${position.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          盈亏: {position.pnl > 0 ? '+' : ''}{position.pnl.toFixed(2)} ({((position.pnl / position.margin) * 100).toFixed(1)}%)
+                        </div>
                       ) : (
-                        <div className="text-xs text-gray-400 mt-0.5">Vol: ${(item as any).volumeFormatted}</div>
+                        <>
+                          {type === 'market' && item.marketCapFormatted ? (
+                            <div className="text-xs text-gray-400 mt-0.5">市值: ${item.marketCapFormatted}</div>
+                          ) : (
+                            <div className="text-xs text-gray-400 mt-0.5">Vol: ${(item as any).volumeFormatted}</div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -173,16 +207,27 @@ export const MarketList: React.FC<MarketListProps> = ({
                       {Math.abs(parseFloat(item.change.toString())).toFixed(2)}%
                     </div>
 
-                    {isOpen ? (
-                      <button
-                        onClick={() => onAddMargin?.(item.symbol, isLong ? 'LONG' : 'SHORT')}
-                        disabled={isTrading}
-                        className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-red-600 hover:bg-red-700"
-                        title={isTrading ? '交易进行中...' : '点击补仓'}
-                      >
-                        <Zap className="w-2.5 h-2.5 fill-white" />
-                        补仓
-                      </button>
+                    {hasPosition ? (
+                      <div className="flex gap-1 items-center">
+                        <button
+                          onClick={() => onAddMargin?.(item.symbol, position.side)}
+                          disabled={isTrading}
+                          className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-red-600 hover:bg-red-700"
+                          title={isTrading ? '交易进行中...' : '点击补仓'}
+                        >
+                          <Zap className="w-2.5 h-2.5 fill-white" />
+                          补
+                        </button>
+                        <button
+                          onClick={() => onClosePosition?.(item.symbol)}
+                          disabled={isTrading}
+                          className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-gray-600 hover:bg-gray-700"
+                          title={isTrading ? '交易进行中...' : '点击平仓'}
+                        >
+                          <X className="w-2.5 h-2.5" />
+                          平
+                        </button>
+                      </div>
                     ) : isSymbolIgnored(item.symbol) ? (
                       <span className="px-2 py-1 rounded-lg font-bold text-xs bg-gray-100 text-gray-500 whitespace-nowrap" title="已被添加到忽略列表">
                         已忽略
@@ -195,6 +240,7 @@ export const MarketList: React.FC<MarketListProps> = ({
                           className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-green-600 hover:bg-green-700"
                           title={isTrading ? '交易进行中...' : '点击做多'}
                         >
+                          <Zap className="w-2.5 h-2.5 fill-white" />
                           多
                         </button>
                         <button
@@ -203,6 +249,7 @@ export const MarketList: React.FC<MarketListProps> = ({
                           className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-red-600 hover:bg-red-700"
                           title={isTrading ? '交易进行中...' : '点击做空'}
                         >
+                          <Zap className="w-2.5 h-2.5 fill-white" />
                           空
                         </button>
                       </div>
@@ -228,10 +275,18 @@ export const MarketList: React.FC<MarketListProps> = ({
                         {formatPrice(parseFloat(item.price.toString()))}
                       </span>
                       <span className="w-1 h-1 rounded-full bg-gray-300" />
-                      {type === 'market' && item.marketCapFormatted ? (
-                        <span className="text-gray-500 font-bold">市值: ${item.marketCapFormatted}</span>
+                      {hasPosition ? (
+                        <span className={`font-bold ${position.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          盈亏: {position.pnl > 0 ? '+' : ''}{position.pnl.toFixed(2)} ({((position.pnl / position.margin) * 100).toFixed(1)}%)
+                        </span>
                       ) : (
-                        <span className="text-gray-500">Vol: ${(item as any).volumeFormatted}</span>
+                        <>
+                          {type === 'market' && item.marketCapFormatted ? (
+                            <span className="text-gray-500 font-bold">市值: ${item.marketCapFormatted}</span>
+                          ) : (
+                            <span className="text-gray-500">Vol: ${(item as any).volumeFormatted}</span>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -247,16 +302,27 @@ export const MarketList: React.FC<MarketListProps> = ({
                     {Math.abs(parseFloat(item.change.toString())).toFixed(2)}%
                   </div>
 
-                  {isOpen ? (
-                    <button
-                      onClick={() => onAddMargin?.(item.symbol, isLong ? 'LONG' : 'SHORT')}
-                      disabled={isTrading}
-                      className="px-3 py-1.5 rounded-lg font-bold text-sm text-white flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 bg-red-600 hover:bg-red-700"
-                      title={isTrading ? '交易进行中...' : '点击补仓'}
-                    >
-                      <Zap className="w-3 h-3 fill-white" />
-                      补仓
-                    </button>
+                  {hasPosition ? (
+                    <div className="flex gap-2 items-center">
+                      <button
+                        onClick={() => onAddMargin?.(item.symbol, position.side)}
+                        disabled={isTrading}
+                        className="px-3 py-1.5 rounded-lg font-bold text-sm text-white flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 bg-red-600 hover:bg-red-700"
+                        title={isTrading ? '交易进行中...' : '点击补仓'}
+                      >
+                        <Zap className="w-3 h-3 fill-white" />
+                        补
+                      </button>
+                      <button
+                        onClick={() => onClosePosition?.(item.symbol)}
+                        disabled={isTrading}
+                        className="px-3 py-1.5 rounded-lg font-bold text-sm text-white flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 bg-gray-600 hover:bg-gray-700"
+                        title={isTrading ? '交易进行中...' : '点击平仓'}
+                      >
+                        <X className="w-3 h-3" />
+                        平
+                      </button>
+                    </div>
                   ) : isSymbolIgnored(item.symbol) ? (
                     <span className="px-3 py-1.5 rounded-lg font-bold text-sm bg-gray-100 text-gray-500" title="已被添加到忽略列表">
                       已忽略

@@ -32,12 +32,13 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
   const [isMobile, setIsMobile] = useState(false);
   const [activeTab, setActiveTab] = useState<'ALL' | 'LONG' | 'SHORT'>('ALL');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   
-  // 格式化价格：最多展示四位小数，去掉末尾的0
+  // 格式化价格：最多展示6位小数，去掉末尾的0
   const formatPrice = (price: number | null | undefined) => {
     if (!price) return '—';
-    // 先格式化为4位小数，然后用parseFloat去掉末尾的0
-    const formatted = parseFloat(price.toFixed(4));
+    // 先格式化为6位小数，然后用parseFloat去掉末尾的0
+    const formatted = parseFloat(price.toFixed(6));
     return `$${formatted}`;
   };
   
@@ -52,6 +53,13 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
     
     checkMobileUA();
   }, []);
+
+  // 监听加载完成，更新刷新时间
+  React.useEffect(() => {
+    if (!loading) {
+      setLastRefreshTime(new Date());
+    }
+  }, [loading]);
   
   
   const totalLongPnl = positions.filter(p => p.side === 'LONG').reduce((acc, p) => acc + p.pnl, 0);
@@ -75,31 +83,9 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
     >
       {/* Header & Stats */}
       <div className="p-3 md:p-6 border-b border-gray-200 space-y-3 md:space-y-6">
+        {/* Top Row: Tabs + Refresh + Title */}
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-            <div className="hidden md:flex p-2.5 bg-indigo-50 text-indigo-600 rounded-xl flex-shrink-0">
-              <Wallet className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="hidden md:block text-lg font-bold text-gray-900">持仓管理</h2>
-              <p className="text-xs text-gray-600 font-medium space-x-2 md:space-x-3 mt-1 whitespace-nowrap">
-                <span>多: <span className="font-bold text-green-600">{positions.filter(p => p.side === 'LONG').length}</span></span>
-                <span>空: <span className="font-bold text-red-600">{positions.filter(p => p.side === 'SHORT').length}</span></span>
-              </p>
-            </div>
-          </div>
-
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
-            {onRefresh && (
-              <button
-                onClick={onRefresh}
-                disabled={loading}
-                className="p-2 rounded-lg transition-all disabled:opacity-50 bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-600"
-                title="刷新持仓"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-            )}
             <div className="flex gap-0.5 md:gap-1 bg-gray-100 p-0.5 md:p-1 rounded-lg md:rounded-xl border border-gray-200">
               {(['ALL', 'LONG', 'SHORT'] as const).map((tab) => (
                 <button
@@ -114,8 +100,36 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                 </button>
               ))}
             </div>
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                disabled={loading}
+                className="p-2 rounded-lg transition-all disabled:opacity-50 bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-600"
+                title="刷新持仓"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            )}
+            {lastRefreshTime && (
+              <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                上次刷新: {lastRefreshTime.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1 justify-end">
+            <div className="hidden md:flex p-2.5 bg-indigo-50 text-indigo-600 rounded-xl flex-shrink-0">
+              <Wallet className="w-5 h-5" />
+            </div>
+            <h2 className="hidden md:block text-lg font-bold text-gray-900">持仓管理</h2>
           </div>
         </div>
+
+        {/* Info Row: Position counts */}
+        <p className="text-xs text-gray-600 font-medium space-x-3">
+          <span>多: <span className="font-bold text-green-600">{positions.filter(p => p.side === 'LONG').length}</span></span>
+          <span>空: <span className="font-bold text-red-600">{positions.filter(p => p.side === 'SHORT').length}</span></span>
+        </p>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-3 gap-3">
