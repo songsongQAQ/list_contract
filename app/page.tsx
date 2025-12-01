@@ -1157,8 +1157,8 @@ export default function BinancePage() {
                   type="market"
                   icon={<Layers className="w-5 h-5 text-blue-500" />}
                   color="blue"
-                  onAction={() => handleTrade('LONG', 'market')}
-                  actionLabel="一键做多"
+                  onActionLong={() => handleTrade('LONG', 'market')}
+                  onActionShort={() => handleTrade('SHORT', 'market')}
                   isTrading={isTrading}
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
@@ -1175,8 +1175,8 @@ export default function BinancePage() {
                   type="gainer"
                   icon={<Activity className="w-5 h-5 text-pink-500" />}
                   color="pink"
-                  onAction={() => handleTrade('SHORT', 'gainers')}
-                  actionLabel="一键做空"
+                  onActionLong={() => handleTrade('LONG', 'gainers')}
+                  onActionShort={() => handleTrade('SHORT', 'gainers')}
                   isTrading={isTrading}
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
@@ -1193,8 +1193,8 @@ export default function BinancePage() {
                   type="loser"
                   icon={<TrendingDown className="w-5 h-5 text-orange-500" />}
                   color="pink"
-                  onAction={() => handleTrade('LONG', 'losers')}
-                  actionLabel="一键做多"
+                  onActionLong={() => handleTrade('LONG', 'losers')}
+                  onActionShort={() => handleTrade('SHORT', 'losers')}
                   isTrading={isTrading}
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
@@ -1308,8 +1308,8 @@ export default function BinancePage() {
                   type="market"
                   icon={<Layers className="w-5 h-5 text-blue-500" />}
                   color="blue"
-                  onAction={() => handleTrade('LONG', 'market')}
-                  actionLabel="一键做多"
+                  onActionLong={() => handleTrade('LONG', 'market')}
+                  onActionShort={() => handleTrade('SHORT', 'market')}
                   isTrading={isTrading}
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
@@ -1330,8 +1330,8 @@ export default function BinancePage() {
                   type="gainer"
                   icon={<TrendingUp className="w-5 h-5 text-pink-500" />}
                   color="pink"
-                  onAction={() => handleTrade('SHORT', 'gainers')}
-                  actionLabel="一键做空"
+                  onActionLong={() => handleTrade('LONG', 'gainers')}
+                  onActionShort={() => handleTrade('SHORT', 'gainers')}
                   isTrading={isTrading}
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}
@@ -1352,8 +1352,8 @@ export default function BinancePage() {
                   type="loser"
                   icon={<TrendingDown className="w-5 h-5 text-orange-500" />}
                   color="pink"
-                  onAction={() => handleTrade('LONG', 'losers')}
-                  actionLabel="一键做多"
+                  onActionLong={() => handleTrade('LONG', 'losers')}
+                  onActionShort={() => handleTrade('SHORT', 'losers')}
                   isTrading={isTrading}
                   isLoading={marketLoading}
                   openPositions={new Set(positions.map(p => p.symbol))}

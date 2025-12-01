@@ -21,8 +21,8 @@ interface MarketListProps {
   type: 'market' | 'gainer' | 'loser';
   icon: React.ReactNode;
   color: 'blue' | 'pink';
-  onAction?: () => void;
-  actionLabel?: string;
+  onActionLong?: () => void;
+  onActionShort?: () => void;
   isTrading?: boolean;
   isLoading?: boolean;
   openPositions?: Set<string>;
@@ -38,8 +38,8 @@ export const MarketList: React.FC<MarketListProps> = ({
   type, 
   icon, 
   color,
-  onAction,
-  actionLabel,
+  onActionLong,
+  onActionShort,
   isTrading,
   isLoading = false,
   openPositions = new Set(),
@@ -104,16 +104,28 @@ export const MarketList: React.FC<MarketListProps> = ({
           <p className="text-gray-500 text-sm font-medium ml-12">{subtitle}</p>
         </div>
 
-        {onAction && (
-          <button
-            onClick={onAction}
-            disabled={isTrading}
-            className={`${buttonColor} text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg shadow-gray-200 hover:shadow-xl transition-all flex items-center gap-1 disabled:opacity-50 disabled:scale-100 active:scale-95`}
-          >
-            <Zap className="w-3 h-3 fill-white" />
-            {actionLabel}
-          </button>
-        )}
+        <div className="flex gap-2 flex-wrap justify-end">
+          {onActionLong && (
+            <button
+              onClick={onActionLong}
+              disabled={isTrading}
+              className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-lg shadow-gray-200 hover:shadow-xl transition-all flex items-center gap-1 disabled:opacity-50 disabled:scale-100 active:scale-95"
+            >
+              <Zap className="w-3 h-3 fill-white" />
+              做多
+            </button>
+          )}
+          {onActionShort && (
+            <button
+              onClick={onActionShort}
+              disabled={isTrading}
+              className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-lg shadow-gray-200 hover:shadow-xl transition-all flex items-center gap-1 disabled:opacity-50 disabled:scale-100 active:scale-95"
+            >
+              <Zap className="w-3 h-3 fill-white" />
+              做空
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="overflow-y-auto p-3 md:p-4 space-y-2 md:space-y-3 flex-1 custom-scrollbar">
@@ -176,15 +188,24 @@ export const MarketList: React.FC<MarketListProps> = ({
                         已忽略
                       </span>
                     ) : (
-                      <button
-                        onClick={() => onOpenPosition?.(item.symbol, isLong ? 'LONG' : 'SHORT')}
-                        disabled={isTrading}
-                        className={`px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap ${buttonColor}`}
-                        title={isTrading ? '交易进行中...' : '点击开仓'}
-                      >
-                        <Zap className="w-2.5 h-2.5 fill-white" />
-                        {isLong ? '做多' : '做空'}
-                      </button>
+                      <div className="flex gap-1 items-center">
+                        <button
+                          onClick={() => onOpenPosition?.(item.symbol, 'LONG')}
+                          disabled={isTrading}
+                          className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-green-600 hover:bg-green-700"
+                          title={isTrading ? '交易进行中...' : '点击做多'}
+                        >
+                          多
+                        </button>
+                        <button
+                          onClick={() => onOpenPosition?.(item.symbol, 'SHORT')}
+                          disabled={isTrading}
+                          className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-red-600 hover:bg-red-700"
+                          title={isTrading ? '交易进行中...' : '点击做空'}
+                        >
+                          空
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -241,15 +262,26 @@ export const MarketList: React.FC<MarketListProps> = ({
                       已忽略
                     </span>
                   ) : (
-                    <button
-                      onClick={() => onOpenPosition?.(item.symbol, isLong ? 'LONG' : 'SHORT')}
-                      disabled={isTrading}
-                      className={`px-3 py-1.5 rounded-lg font-bold text-sm text-white flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 ${buttonColor}`}
-                      title={isTrading ? '交易进行中...' : '点击开仓'}
-                    >
-                      <Zap className="w-3 h-3 fill-white" />
-                      {isLong ? '做多' : '做空'}
-                    </button>
+                    <div className="flex gap-2 items-center">
+                      <button
+                        onClick={() => onOpenPosition?.(item.symbol, 'LONG')}
+                        disabled={isTrading}
+                        className="px-3 py-1.5 rounded-lg font-bold text-sm text-white flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 bg-green-600 hover:bg-green-700"
+                        title={isTrading ? '交易进行中...' : '点击做多'}
+                      >
+                        <Zap className="w-3 h-3 fill-white" />
+                        多
+                      </button>
+                      <button
+                        onClick={() => onOpenPosition?.(item.symbol, 'SHORT')}
+                        disabled={isTrading}
+                        className="px-3 py-1.5 rounded-lg font-bold text-sm text-white flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 bg-red-600 hover:bg-red-700"
+                        title={isTrading ? '交易进行中...' : '点击做空'}
+                      >
+                        <Zap className="w-3 h-3 fill-white" />
+                        空
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

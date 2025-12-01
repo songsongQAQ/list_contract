@@ -28,6 +28,7 @@ const vt323 = VT323({
 export const metadata: Metadata = {
   title: "榜单合约",
   description: "基于 Binance 期货的榜单交易系统，支持市值榜单和涨幅榜单交易，实时市场数据和持仓管理",
+  viewport: "width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover",
 };
 
 export default function RootLayout({
