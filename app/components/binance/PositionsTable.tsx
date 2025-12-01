@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, ArrowUpRight, ArrowDownRight, X, Trash2, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
+import { Wallet, ArrowUpRight, ArrowDownRight, X, Trash2, TrendingUp, TrendingDown, RefreshCw, Zap } from 'lucide-react';
 
 interface Position {
   symbol: string;
@@ -288,8 +288,8 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                     <div className="flex items-start gap-2">
                       <span className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${p.side === 'LONG' ? 'bg-green-500' : 'bg-red-500'}`} />
                       <div>
-                        <h3 className="font-bold text-sm text-gray-900">{p.symbol.replace(/\/USDT:USDT|\/USDT|:USDT/, '')}</h3>
-                        <div className="flex items-center gap-1.5 mt-1">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <h3 className="font-bold text-sm text-gray-900">{p.symbol.replace(/\/USDT:USDT|\/USDT|:USDT/, '')}</h3>
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${p.side === 'LONG' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                             {p.side === 'LONG' ? '做多' : '做空'}
                           </span>
@@ -299,14 +299,26 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                         </div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => onClose(p.symbol)}
-                      disabled={loading}
-                      className="p-1.5 rounded-lg transition-all disabled:opacity-50 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 flex-shrink-0"
-                      title={`平${p.side === 'LONG' ? '多' : '空'}`}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                    <div className="flex gap-1 flex-shrink-0">
+                      {/* 补按钮 - 暂时注释 */}
+                      {/* <button
+                        disabled={loading}
+                        className="px-2 py-1 rounded-lg text-[12px] font-bold text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-red-600 hover:bg-red-700"
+                        title="补仓"
+                      >
+                        <Zap className="w-2.5 h-2.5 fill-white" />
+                        补
+                      </button> */}
+                      <button
+                        onClick={() => onClose(p.symbol)}
+                        disabled={loading}
+                        className="px-2 py-1 rounded-lg text-[12px] font-bold text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-gray-600 hover:bg-gray-700"
+                        title={`平${p.side === 'LONG' ? '多' : '空'}`}
+                      >
+                        <X className="w-2.5 h-2.5" />
+                        平
+                      </button>
+                    </div>
                   </div>
 
                   {/* Grid: Details */}
