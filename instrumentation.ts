@@ -404,15 +404,6 @@ async function fetchAndPrintTopGainers() {
       await checkAndPushAlerts(coin.symbol, coin.price, 10);
     }
 
-    // 存储价格数据并检查涨幅条件（市值榜单，阈值5%）
-    for (const coin of topMarket) {
-      // 添加价格数据到历史记录
-      addPriceData(coin.symbol, coin.price);
-      
-      // 检查涨幅条件并推送（异步，阈值5%）
-      await checkAndPushAlerts(coin.symbol, coin.price, 5);
-    }
-
     // 打印当前时间
     const now = new Date().toLocaleString('zh-CN', { 
       timeZone: 'Asia/Shanghai',
@@ -444,8 +435,7 @@ async function fetchAndPrintTopGainers() {
     
     console.log('─'.repeat(60));
     console.log(`✅ 涨幅榜单: ${topGainers.length} 个币种`);
-    console.log(`✅ 市值榜单: ${topMarket.length} 个币种`);
-    console.log(`💾 当前存储币种数: ${priceHistory.size}\n`);
+    console.log('');
     
   } catch (error: any) {
     console.error('❌ 获取涨幅榜单失败:', error.message);
