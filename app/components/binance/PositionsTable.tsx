@@ -54,7 +54,13 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
     checkMobileUA();
   }, []);
 
-  // 监听加载完成，更新刷新时间
+  // 监听 positions 变化，更新刷新时间（包括 SSE 推送和手动刷新）
+  React.useEffect(() => {
+    // 当 positions 变化时（包括 SSE 推送），更新刷新时间
+    setLastRefreshTime(new Date());
+  }, [positions]);
+  
+  // 监听 loading 状态变化，更新刷新时间（手动刷新完成时）
   React.useEffect(() => {
     if (!loading) {
       setLastRefreshTime(new Date());

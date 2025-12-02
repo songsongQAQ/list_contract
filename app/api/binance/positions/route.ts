@@ -105,22 +105,28 @@ export async function GET(request: NextRequest) {
     const positions = await client.fetchPositions();
     const balance = await client.fetchBalance();
     
-    // Get USDT wallet balance - try multiple paths
+    // Get USDT wallet balance - 优先使用 total（总余额），包括已占用的保证金
     let usdtBalance = 0;
     const balanceAny = balance as any;
     
     if (balanceAny.USDT) {
       const usdtObj = balanceAny.USDT;
-      if (typeof usdtObj === 'object' && usdtObj.free) {
-        usdtBalance = typeof usdtObj.free === 'string' ? parseFloat(usdtObj.free) : usdtObj.free;
-      } else if (typeof usdtObj === 'object' && usdtObj.total) {
+      // 优先使用 total（总余额），如果没有则使用 free（可用余额）
+      if (typeof usdtObj === 'object' && usdtObj.total !== undefined) {
         usdtBalance = typeof usdtObj.total === 'string' ? parseFloat(usdtObj.total) : usdtObj.total;
+      } else if (typeof usdtObj === 'object' && usdtObj.free !== undefined) {
+        usdtBalance = typeof usdtObj.free === 'string' ? parseFloat(usdtObj.free) : usdtObj.free;
       } else if (typeof usdtObj === 'number') {
         usdtBalance = usdtObj;
       } else if (typeof usdtObj === 'string') {
         usdtBalance = parseFloat(usdtObj);
       }
+    } else if (balanceAny.total?.USDT) {
+      // 尝试从 total.USDT 获取
+      const usdt = balanceAny.total.USDT;
+      usdtBalance = typeof usdt === 'string' ? parseFloat(usdt) : (typeof usdt === 'number' ? usdt : 0);
     } else if (balanceAny.free?.USDT) {
+      // 最后尝试从 free.USDT 获取
       const usdt = balanceAny.free.USDT;
       usdtBalance = typeof usdt === 'string' ? parseFloat(usdt) : (typeof usdt === 'number' ? usdt : 0);
     }

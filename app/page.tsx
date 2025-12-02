@@ -269,10 +269,9 @@ export default function BinancePage() {
           setCopytradingMode(config.copytradingMode);
         }
         
-        // 已登录且配置有效，立即获取持仓和榜单数据
+        // 已登录且配置有效，立即获取榜单数据（持仓数据通过 SSE 自动推送）
         if (hasApiKey) {
           fetchMarketData();
-          fetchPositions();
         }
       } else {
         setHasCredentials(false);
@@ -399,6 +398,92 @@ export default function BinancePage() {
     }
   };
 
+  // SSE 连接持仓数据推送
+  useEffect(() => {
+    if (!hasCredentials) {
+      setPositions([]);
+      setWalletBalance(0);
+      return;
+    }
+
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    const reconnectDelay = 3000; // 3秒
+
+    const connectSSE = () => {
+      try {
+        eventSource = new EventSource('/api/binance/positions/sse');
+        
+        eventSource.onopen = () => {
+          console.log('✓ SSE 持仓连接已建立');
+          reconnectAttempts = 0;
+          setPositionsLoading(false);
+        };
+
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'connected') {
+              console.log('✓ SSE 持仓连接已确认');
+            } else if (data.type === 'positions') {
+              setPositions(data.positions || []);
+              setWalletBalance(data.walletBalance || 0);
+              
+              // 更新网页标题
+              if (data.positions && data.positions.length > 0) {
+                const totalPnl = data.positions.reduce((sum: number, pos: any) => sum + (pos.pnl || 0), 0);
+                const pnlText = totalPnl > 0 ? `+${totalPnl.toFixed(2)}` : totalPnl.toFixed(2);
+                document.title = pnlText;
+              } else {
+                document.title = '榜单合约';
+              }
+            } else if (data.type === 'error') {
+              console.error('❌ SSE 持仓错误:', data.error);
+              setPositions([]);
+              setWalletBalance(0);
+            }
+          } catch (error) {
+            console.error('Failed to parse SSE message:', error);
+          }
+        };
+
+        eventSource.onerror = (error) => {
+          console.error('SSE 持仓连接错误:', error);
+          eventSource?.close();
+          
+          // 重连逻辑
+          if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            console.log(`正在重连 SSE 持仓 (${reconnectAttempts}/${maxReconnectAttempts})...`);
+            reconnectTimeout = setTimeout(() => {
+              connectSSE();
+            }, reconnectDelay);
+          } else {
+            console.error('SSE 持仓连接失败，已达到最大重连次数');
+            setPositionsLoading(false);
+          }
+        };
+      } catch (error) {
+        console.error('Failed to create SSE connection:', error);
+        setPositionsLoading(false);
+      }
+    };
+
+    connectSSE();
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+    };
+  }, [hasCredentials]);
+
   useEffect(() => {
     // 检查是否有 API 密钥（从用户配置中读取）
     const checkCredentials = () => {
@@ -412,10 +497,9 @@ export default function BinancePage() {
     // 检查凭证并加载数据
     const credentialsExist = checkCredentials();
 
-    // 仅在有凭证时才加载数据
+    // 仅在有凭证时才加载市场数据（持仓数据通过 SSE 自动推送）
     if (credentialsExist) {
       fetchMarketData();
-      fetchPositions();
     }
     
     // 简单的同步检查函数用于定时器（从用户配置中读取）
@@ -426,7 +510,6 @@ export default function BinancePage() {
     };
     
     let marketInterval: NodeJS.Timeout;
-    let positionsInterval: NodeJS.Timeout;
     
     // 启动定时刷新
     if (credentialsExist) {
@@ -437,14 +520,6 @@ export default function BinancePage() {
           fetchMarketData();
         }
       }, 60000);
-      
-      // 持仓每10秒刷新一次
-      positionsInterval = setInterval(() => {
-        if (checkCredentialsSync()) {
-          console.log(`[${new Date().toLocaleTimeString()}] 自动刷新持仓数据`);
-          fetchPositions();
-        }
-      }, 10000);
     }
     
     // 监听设置变化事件
@@ -466,7 +541,6 @@ export default function BinancePage() {
     
     return () => {
       clearInterval(marketInterval);
-      clearInterval(positionsInterval);
       window.removeEventListener('settingsChanged', handleSettingsChanged);
     };
   }, [limit]);
@@ -618,7 +692,7 @@ export default function BinancePage() {
       setIsTrading(false);
       // 确保进度显示为 100%
       setTradeProgress(symbols.length);
-      fetchPositions();
+      // 持仓数据会通过 SSE 自动更新，无需手动刷新
     };
 
     setConfirmData({
@@ -696,7 +770,7 @@ export default function BinancePage() {
         setIsTrading(false);
         // 确保进度显示为 100%
         setTradeProgress(1);
-        fetchPositions();
+        // 持仓数据会通过 SSE 自动更新，无需手动刷新
       }
     };
 
@@ -953,7 +1027,7 @@ export default function BinancePage() {
         setIsTrading(false);
         // 确保进度显示为 100%
         setTradeProgress(1);
-        fetchPositions();
+        // 持仓数据会通过 SSE 自动更新，无需手动刷新
       }
     };
 
@@ -1087,7 +1161,7 @@ export default function BinancePage() {
           }
         }
         
-        fetchPositions();
+        // 持仓数据会通过 SSE 自动更新，无需手动刷新
       } catch (error) {
         console.error('Failed to close positions', error);
         setTradeResults([{
