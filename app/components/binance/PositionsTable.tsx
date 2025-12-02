@@ -161,19 +161,18 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
           <div className="overflow-auto flex-1">
             <table className="w-full border-collapse table-fixed">
               <colgroup>
-                <col className="w-[20%]" />
-                <col className="w-[16%]" />
-                <col className="w-[18%]" />
                 <col className="w-[18%]" />
                 <col className="w-[16%]" />
-                <col className="w-[12%]" />
+                <col className="w-[18%]" />
+                <col className="w-[16%]" />
+                <col className="w-[16%]" />
+                <col className="w-[16%]" />
               </colgroup>
               <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
                 <tr className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
                   <th className="text-left px-4 py-3 whitespace-nowrap">币种 / 杠杆</th>
                   <th className="text-right px-4 py-3 whitespace-nowrap">数量 / 价值</th>
                   <th className="text-right px-4 py-3 whitespace-nowrap">开仓 / 标记</th>
-                  <th className="text-right px-4 py-3 whitespace-nowrap">止盈 / 止损</th>
                   <th className="text-right px-4 py-3 whitespace-nowrap">
                     <button
                       onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
@@ -188,6 +187,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                       )}
                     </button>
                   </th>
+                  <th className="text-right px-4 py-3 whitespace-nowrap">止盈 / 止损</th>
                   <th className="text-center px-4 py-3 whitespace-nowrap">操作</th>
                 </tr>
               </thead>
@@ -235,16 +235,16 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                         <p className="text-xs text-gray-500 tabular-nums font-medium mt-0.5 whitespace-nowrap">${parseFloat(p.markPrice.toFixed(4))}</p>
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        <p className="font-bold text-green-700 tabular-nums text-sm whitespace-nowrap">{formatPrice(p.takeProfitPrice)}</p>
-                        <p className="text-xs text-red-600 tabular-nums font-bold mt-0.5 whitespace-nowrap">{formatPrice(p.stopLossPrice)}</p>
-                      </td>
-                      <td className="px-4 py-3.5 text-right">
                         <p className={`font-bold tabular-nums text-sm whitespace-nowrap ${p.pnl >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                           {p.pnl > 0 ? '+' : ''}{p.pnl.toFixed(2)}
                         </p>
                         <p className={`text-xs font-bold tabular-nums mt-0.5 whitespace-nowrap ${p.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {((p.pnl / p.margin) * 100).toFixed(1)}%
                         </p>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <p className="font-bold text-green-700 tabular-nums text-sm whitespace-nowrap">{formatPrice(p.takeProfitPrice)}</p>
+                        <p className="text-xs text-red-600 tabular-nums font-bold mt-0.5 whitespace-nowrap">{formatPrice(p.stopLossPrice)}</p>
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         <button
@@ -322,7 +322,7 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                   </div>
 
                   {/* Grid: Details */}
-                  <div className="grid grid-cols-2 gap-2 bg-gray-50 rounded-lg p-2">
+                  <div className="grid grid-cols-3 gap-2 bg-gray-50 rounded-lg p-2">
                     <div>
                       <p className="text-[11px] text-gray-500 font-medium mb-0.5">数量</p>
                       <p className="text-sm font-bold text-gray-900">{parseFloat(p.size.toFixed(4))}</p>
@@ -331,6 +331,12 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                       <p className="text-[11px] text-gray-500 font-medium mb-0.5">仓位价值</p>
                       <p className="text-sm font-bold text-gray-900">${p.positionNotional.toFixed(0)}</p>
                     </div>
+                    <div className="row-span-2">
+                      <p className="text-[11px] text-green-600 font-medium mb-0.5">止盈价</p>
+                      <p className="text-sm font-bold text-green-700 mb-2">{formatPrice(p.takeProfitPrice)}</p>
+                      <p className="text-[11px] text-red-600 font-medium mb-0.5">止损价</p>
+                      <p className="text-sm font-bold text-red-700">{formatPrice(p.stopLossPrice)}</p>
+                    </div>
                     <div>
                       <p className="text-[11px] text-gray-500 font-medium mb-0.5">开仓价</p>
                       <p className="text-sm font-bold text-gray-900">${parseFloat(p.entryPrice.toFixed(4))}</p>
@@ -338,14 +344,6 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                     <div>
                       <p className="text-[11px] text-gray-500 font-medium mb-0.5">标记价</p>
                       <p className="text-sm font-bold text-gray-900">${parseFloat(p.markPrice.toFixed(4))}</p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-green-600 font-medium mb-0.5">止盈价</p>
-                      <p className="text-sm font-bold text-green-700">{formatPrice(p.takeProfitPrice)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-red-600 font-medium mb-0.5">止损价</p>
-                      <p className="text-sm font-bold text-red-700">{formatPrice(p.stopLossPrice)}</p>
                     </div>
                   </div>
 

@@ -286,68 +286,66 @@ export const MarketList: React.FC<MarketListProps> = ({
                 </div>
               </div>
 
-              {/* Desktop Layout */}
-              <div className="hidden md:flex justify-between items-center">
-                <div className="flex items-center gap-3 flex-1">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500 group-hover:bg-gray-900 group-hover:text-white transition-colors">
+              {/* Desktop Layout (same as mobile) */}
+              <div className="hidden md:flex items-start justify-between gap-3">
+                {/* Left: Rank + Symbol + Price */}
+                <div className="flex items-start gap-2 flex-1 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0 group-hover:bg-gray-900 group-hover:text-white transition-colors">
                     {index + 1}
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-gray-900">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-sm text-gray-900 truncate">
                       {item.symbol.replace(/\/USDT:USDT|\/USDT|:USDT/, '')}
                       {type === 'market' && item.rank && <span className="ml-2 text-xs text-gray-400">#{item.rank}</span>}
                     </h3>
-                    <div className="flex items-center gap-2 text-xs text-gray-400 font-medium mt-0.5">
-                      <span className="flex items-center">
-                        <DollarSign className="w-3 h-3" />
-                        {formatPrice(parseFloat(item.price.toString()))}
-                      </span>
-                      <span className="w-1 h-1 rounded-full bg-gray-300" />
-                      {hasPosition ? (
-                        <span className={`font-bold ${position.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          盈亏: {position.pnl > 0 ? '+' : ''}{position.pnl.toFixed(2)} ({((position.pnl / position.margin) * 100).toFixed(1)}%)
-                        </span>
-                      ) : (
-                        <>
-                          {type === 'market' && item.marketCapFormatted ? (
-                            <span className="text-gray-500 font-bold">市值: ${item.marketCapFormatted}</span>
-                          ) : (
-                            <span className="text-gray-500">Vol: ${item.volumeFormatted || formatVolume(item.volume)}</span>
-                          )}
-                        </>
-                      )}
+                    <div className="text-xs text-gray-500 font-medium mt-0.5">
+                      ${formatPrice(parseFloat(item.price.toString()))}
                     </div>
+                    {hasPosition ? (
+                      <div className={`text-xs font-bold mt-0.5 ${position.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        盈亏: {position.pnl > 0 ? '+' : ''}{position.pnl.toFixed(2)} ({((position.pnl / position.margin) * 100).toFixed(1)}%)
+                      </div>
+                    ) : (
+                      <>
+                        {type === 'market' && item.marketCapFormatted ? (
+                          <div className="text-xs text-gray-400 mt-0.5">市值: ${item.marketCapFormatted}</div>
+                        ) : (
+                          <div className="text-xs text-gray-400 mt-0.5">Vol: ${item.volumeFormatted || formatVolume(item.volume)}</div>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <div className={`flex items-center gap-1 px-3 py-1.5 rounded-lg font-bold text-sm ${
+                {/* Right: Change + Action */}
+                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                  <div className={`flex items-center gap-0.5 px-2 py-1 rounded-lg font-bold text-xs whitespace-nowrap ${
                     item.change >= 0 
                       ? 'bg-green-50 text-green-600' 
                       : 'bg-red-50 text-red-600'
                   }`}>
-                    {item.change >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                    {item.change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                     {Math.abs(parseFloat(item.change.toString())).toFixed(2)}%
                   </div>
 
                   {hasPosition ? (
-                    <div className="flex gap-2 items-center">
+                    <div className="flex gap-1 items-center">
                       <button
                         onClick={() => onAddMargin?.(item.symbol, position.side)}
                         disabled={isTrading}
-                        className="px-3 py-1.5 rounded-lg font-bold text-sm text-white flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 bg-red-600 hover:bg-red-700"
+                        className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-red-600 hover:bg-red-700"
                         title={isTrading ? '交易进行中...' : '点击补仓'}
                       >
-                        <Zap className="w-3 h-3 fill-white" />
+                        <Zap className="w-2.5 h-2.5 fill-white" />
                         补
                       </button>
                       <button
                         onClick={() => onClosePosition?.(item.symbol)}
                         disabled={isTrading}
-                        className="px-3 py-1.5 rounded-lg font-bold text-sm text-white flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 bg-gray-600 hover:bg-gray-700"
+                        className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-gray-600 hover:bg-gray-700"
                         title={isTrading ? '交易进行中...' : '点击平仓'}
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-2.5 h-2.5" />
                         平
                       </button>
                     </div>
@@ -355,39 +353,39 @@ export const MarketList: React.FC<MarketListProps> = ({
                     <button
                       onClick={() => onRemoveFromIgnore?.(item.symbol)}
                       disabled={isTrading}
-                      className="px-3 py-1.5 rounded-lg font-bold text-sm text-white flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 bg-gray-500 hover:bg-gray-600"
+                      className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-gray-500 hover:bg-gray-600"
                       title="取消拉黑"
                     >
-                      <CheckCircle2 className="w-3 h-3" />
+                      <CheckCircle2 className="w-2.5 h-2.5" />
                       取消拉黑
                     </button>
                   ) : (
-                    <div className="flex gap-2 items-center">
+                    <div className="flex gap-1 items-center">
                       <button
                         onClick={() => onAddToIgnore?.(item.symbol)}
                         disabled={isTrading}
-                        className="px-3 py-1.5 rounded-lg font-bold text-sm text-white flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 bg-gray-800 hover:bg-gray-900"
+                        className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-gray-800 hover:bg-gray-900"
                         title="添加到忽略列表"
                       >
-                        <Ban className="w-3 h-3" />
+                        <Ban className="w-2.5 h-2.5" />
                         黑
                       </button>
                       <button
                         onClick={() => onOpenPosition?.(item.symbol, 'LONG')}
                         disabled={isTrading}
-                        className="px-3 py-1.5 rounded-lg font-bold text-sm text-white flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 bg-green-600 hover:bg-green-700"
+                        className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-green-600 hover:bg-green-700"
                         title={isTrading ? '交易进行中...' : '点击做多'}
                       >
-                        <Zap className="w-3 h-3 fill-white" />
+                        <Zap className="w-2.5 h-2.5 fill-white" />
                         多
                       </button>
                       <button
                         onClick={() => onOpenPosition?.(item.symbol, 'SHORT')}
                         disabled={isTrading}
-                        className="px-3 py-1.5 rounded-lg font-bold text-sm text-white flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 bg-red-600 hover:bg-red-700"
+                        className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-red-600 hover:bg-red-700"
                         title={isTrading ? '交易进行中...' : '点击做空'}
                       >
-                        <Zap className="w-3 h-3 fill-white" />
+                        <Zap className="w-2.5 h-2.5 fill-white" />
                         空
                       </button>
                     </div>
