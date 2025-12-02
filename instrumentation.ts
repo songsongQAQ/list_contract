@@ -353,7 +353,8 @@ async function fetchAndPrintTopGainers() {
     const baseUrl = process.env.NEXTAUTH_URL || `http://localhost:${port}`;
     
     // 使用 HTTP 请求调用内部 API（避免模块导入导致的 Edge Runtime 问题）
-    const apiUrl = `${baseUrl}/api/binance/market?limit=20`;
+    // skipMarketCap=true 跳过市值查询，节省 CoinGecko API 额度
+    const apiUrl = `${baseUrl}/api/binance/market?limit=20&skipMarketCap=true`;
     
     const response = await fetch(apiUrl, {
       cache: 'no-store',

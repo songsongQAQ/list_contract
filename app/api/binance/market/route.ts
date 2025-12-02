@@ -3,11 +3,14 @@ import { getBinanceClient } from '@/lib/binance-client';
 
 export const dynamic = 'force-dynamic';
 
+// CoinGecko API Key
+const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY || 'CG-XCQVejpEcFBGg96nRcw2mkTH';
+
 // 格式化市值
 const formatMarketCap = (num: number): string => {
-  if (num >= 1e12) return (num / 1e12).toFixed(2) + '万亿'; // 万亿（Trillion）
-  if (num >= 1e8) return (num / 1e8).toFixed(2) + '亿'; // 亿（1亿 = 1e8）
-  if (num >= 1e6) return (num / 1e6).toFixed(2) + '百万'; // 百万（Million）
+  if (num >= 1e12) return (num / 1e12).toFixed(2) + '万亿';
+  if (num >= 1e8) return (num / 1e8).toFixed(2) + '亿';
+  if (num >= 1e6) return (num / 1e6).toFixed(2) + '百万';
   return num.toFixed(2);
 };
 
@@ -19,42 +22,63 @@ const formatVolume = (num: number) => {
   return num.toFixed(2);
 };
 
-// 从 CoinGecko 获取市值数据（获取前200名以覆盖更多币种）
-async function getMarketCapData() {
+// 清理币种符号，处理 Binance 的特殊格式（如 1000PEPE -> PEPE）
+function normalizeSymbol(symbol: string): string[] {
+  const upper = symbol.toUpperCase();
+  const variants: string[] = [upper];
+  
+  const withoutPrefix = upper.replace(/^\d+/, '');
+  if (withoutPrefix !== upper && withoutPrefix.length > 0) {
+    variants.push(withoutPrefix);
+  }
+  
+  const withoutSuffix = upper.split('/')[0].split(':')[0];
+  if (withoutSuffix !== upper) {
+    variants.push(withoutSuffix);
+  }
+  
+  return [...new Set(variants)];
+}
+
+// 从 CoinGecko 获取市值数据
+async function getMarketCapData(): Promise<Map<string, { marketCap: number; marketCapFormatted: string; rank: number }> | null> {
   try {
-    const response = await fetch(
-      `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=200&page=1&sparkline=false`,
-      { 
-        cache: 'no-store', // 禁用缓存，每次都获取最新数据
-        headers: {
-          'Accept': 'application/json',
-        }
-      }
-    );
+    const apiUrl = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=200&page=1&sparkline=false&x_cg_demo_api_key=${COINGECKO_API_KEY}`;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    const response = await fetch(apiUrl, { 
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json' },
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
-      console.error('CoinGecko API error:', response.status, response.statusText);
+      console.error(`CoinGecko API error: ${response.status}`);
       return null;
     }
     
     const data = await response.json();
     
     if (!Array.isArray(data) || data.length === 0) {
-      console.error('CoinGecko returned invalid data');
       return null;
     }
     
-    const marketCapMap = new Map();
+    const marketCapMap = new Map<string, { marketCap: number; marketCapFormatted: string; rank: number }>();
     
     data.forEach((coin: any) => {
-      if (!coin.market_cap || coin.market_cap <= 0) return;
+      if (!coin.market_cap || coin.market_cap <= 0 || !coin.symbol || !coin.market_cap_rank) {
+        return;
+      }
       
       const symbol = coin.symbol.toUpperCase();
       const existing = marketCapMap.get(symbol);
       
-      // 如果该符号已存在，只保留市值排名更高的（排名数字更小的）
       if (existing && existing.rank < coin.market_cap_rank) {
-        return; // 跳过排名较低的币种
+        return;
       }
       
       marketCapMap.set(symbol, {
@@ -64,29 +88,25 @@ async function getMarketCapData() {
       });
     });
     
-    console.log(`✓ Loaded market cap data for ${marketCapMap.size} coins from CoinGecko`);
     return marketCapMap;
-  } catch (error) {
-    console.error('Failed to fetch market cap data:', error);
+  } catch (error: any) {
+    console.error('Failed to fetch market cap data:', error.message || error);
     return null;
   }
 }
+
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '50');
+    const skipMarketCap = searchParams.get('skipMarketCap') === 'true';
     
     // market API 不需要认证，使用公开客户端
-    const [client, marketCapMap] = await Promise.all([
-      getBinanceClient(undefined, undefined, false),
-      getMarketCapData()
-    ]);
+    const client = await getBinanceClient(undefined, undefined, false);
     
-    // 如果市值数据获取失败，记录警告
-    if (!marketCapMap || marketCapMap.size === 0) {
-      console.warn('⚠️ Market cap data unavailable, falling back to volume-based sorting');
-    }
+    // 只有在不跳过市值查询时才调用 CoinGecko API
+    const marketCapMap = skipMarketCap ? null : await getMarketCapData();
     
     const tickers = await client.fetchTickers();
     
@@ -119,27 +139,32 @@ export async function GET(request: Request) {
     });
 
     // 将市值数据添加到 ticker 中
-    const enrichedTickers = usdtTickers.map((ticker: any, index: number) => {
-      // 提取币种符号（如 BTC/USDT:USDT -> BTC）
+    const enrichedTickers = usdtTickers.map((ticker: any) => {
       const coinSymbol = ticker.symbol.split('/')[0];
-      const marketCapData = marketCapMap?.get(coinSymbol);
+      let marketCapData = marketCapMap?.get(coinSymbol);
+      
+      if (!marketCapData) {
+        const normalizedSymbols = normalizeSymbol(coinSymbol);
+        for (const normalized of normalizedSymbols) {
+          marketCapData = marketCapMap?.get(normalized);
+          if (marketCapData) break;
+        }
+      }
       
       return {
         ...ticker,
         marketCap: marketCapData?.marketCap || 0,
         marketCapFormatted: marketCapData?.marketCapFormatted || 'N/A',
-        rank: marketCapData?.rank || null, // 没有市值数据时 rank 为 null
-        hasMarketCapData: !!marketCapData, // 标记是否有市值数据
+        rank: marketCapData?.rank || null,
+        hasMarketCapData: !!marketCapData,
       };
     });
 
-    // Sort by Market Cap (真实市值排序)
-    // 只选择有市值数据的币种（排除市值为0或N/A的）
+    // Sort by Market Cap (按市值排序)
     const withMarketCap = enrichedTickers.filter((t: any) => t.hasMarketCapData);
     
     let topMarket;
     if (withMarketCap.length >= limit) {
-      // 如果有足够的市值数据，按市值排序（按 rank 排名排序）
       topMarket = [...withMarketCap]
         .sort((a: any, b: any) => (a.rank || 999999) - (b.rank || 999999))
         .slice(0, limit)
@@ -154,8 +179,6 @@ export async function GET(request: Request) {
           rank: t.rank,
         }));
     } else {
-      // 降级方案：如果市值数据不足，按交易量排序
-      console.warn(`⚠️ Insufficient market cap data (${withMarketCap.length}/${limit}), using volume-based sorting`);
       topMarket = [...enrichedTickers]
         .sort((a: any, b: any) => (b.quoteVolume || 0) - (a.quoteVolume || 0))
         .slice(0, limit)

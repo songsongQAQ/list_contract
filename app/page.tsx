@@ -711,6 +711,184 @@ export default function BinancePage() {
   };
 
   // 补仓处理函数
+  const handleAddToIgnore = async (symbol: string) => {
+    // 提取币种符号（如 BTC/USDT:USDT -> BTC）
+    const coinSymbol = symbol.split('/')[0].split(':')[0].toUpperCase();
+    
+    // 获取当前忽略列表
+    const currentIgnored = userConfig?.ignoredSymbols || '';
+    const ignoredList = currentIgnored
+      .split(/\s+/)
+      .filter(s => s.length > 0)
+      .map(s => s.toUpperCase());
+    
+    // 如果已经在忽略列表中，直接返回
+    if (ignoredList.includes(coinSymbol)) {
+      console.log(`币种 ${coinSymbol} 已在忽略列表中`);
+      return;
+    }
+    
+    // 显示确认弹窗
+    setConfirmData({
+      title: '确认拉黑',
+      message: `确定要将 ${coinSymbol} 添加到忽略列表吗？\n拉黑后该币种将不会出现在交易列表中。`,
+      confirmText: '确定',
+      cancelText: '取消',
+      onConfirm: async () => {
+        try {
+          // 先获取数据库中的最新配置，避免覆盖其他配置
+          const configRes = await fetch('/api/user/config');
+          if (!configRes.ok) {
+            throw new Error('获取配置失败');
+          }
+          const configData = await configRes.json();
+          const currentConfig = configData.config || {};
+          
+          // 添加到忽略列表
+          const newIgnoredList = [...ignoredList, coinSymbol].join(' ');
+          
+          // 更新配置（只更新 ignoredSymbols，保留其他所有配置）
+          const res = await fetch('/api/user/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              apiKey: currentConfig.apiKey || null,
+              apiSecret: currentConfig.apiSecret || null,
+              longLeverage: currentConfig.longLeverage || '50',
+              longMargin: currentConfig.longMargin || '3',
+              shortLeverage: currentConfig.shortLeverage || '50',
+              shortMargin: currentConfig.shortMargin || '3',
+              defaultLimit: currentConfig.defaultLimit || String(limit), // 保持数据库中的值不变
+              ignoredSymbols: newIgnoredList,
+              takeProfit: currentConfig.takeProfit || null,
+              stopLoss: currentConfig.stopLoss || null,
+              copytradingMode: currentConfig.copytradingMode || false,
+              copytradingApiKey: currentConfig.copytradingApiKey || null,
+              copytradingApiSecret: currentConfig.copytradingApiSecret || null,
+            }),
+          });
+          
+          if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || '添加到忽略列表失败');
+          }
+          
+          const result = await res.json();
+          
+          // 更新本地缓存（只更新 ignoredSymbols，不改变其他字段，特别是 defaultLimit）
+          const cachedConfig = userConfigStorage.get();
+          userConfigStorage.set({
+            ...cachedConfig,
+            ignoredSymbols: newIgnoredList,
+          });
+          
+          // 更新状态（只更新 ignoredSymbols，不改变 limit）
+          setUserConfig(prev => ({
+            ...prev!,
+            ignoredSymbols: newIgnoredList,
+          }));
+          
+          console.log(`✓ 已将 ${coinSymbol} 添加到忽略列表`);
+        } catch (error) {
+          console.error('添加到忽略列表失败:', error);
+          setErrorMessage(error instanceof Error ? error.message : '添加到忽略列表失败');
+          setErrorModalOpen(true);
+        }
+      },
+    });
+    setConfirmOpen(true);
+  };
+
+  const handleRemoveFromIgnore = async (symbol: string) => {
+    // 提取币种符号（如 BTC/USDT:USDT -> BTC）
+    const coinSymbol = symbol.split('/')[0].split(':')[0].toUpperCase();
+    
+    // 获取当前忽略列表
+    const currentIgnored = userConfig?.ignoredSymbols || '';
+    const ignoredList = currentIgnored
+      .split(/\s+/)
+      .filter(s => s.length > 0)
+      .map(s => s.toUpperCase());
+    
+    // 如果不在忽略列表中，直接返回
+    if (!ignoredList.includes(coinSymbol)) {
+      console.log(`币种 ${coinSymbol} 不在忽略列表中`);
+      return;
+    }
+    
+    // 显示确认弹窗
+    setConfirmData({
+      title: '确认取消拉黑',
+      message: `确定要将 ${coinSymbol} 从忽略列表中移除吗？\n取消拉黑后该币种将重新出现在交易列表中。`,
+      confirmText: '确定',
+      cancelText: '取消',
+      onConfirm: async () => {
+        try {
+          // 先获取数据库中的最新配置，避免覆盖其他配置
+          const configRes = await fetch('/api/user/config');
+          if (!configRes.ok) {
+            throw new Error('获取配置失败');
+          }
+          const configData = await configRes.json();
+          const currentConfig = configData.config || {};
+          
+          // 从忽略列表中移除
+          const newIgnoredList = ignoredList
+            .filter(s => s !== coinSymbol)
+            .join(' ');
+          
+          // 更新配置（只更新 ignoredSymbols，保留其他所有配置）
+          const res = await fetch('/api/user/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              apiKey: currentConfig.apiKey || null,
+              apiSecret: currentConfig.apiSecret || null,
+              longLeverage: currentConfig.longLeverage || '50',
+              longMargin: currentConfig.longMargin || '3',
+              shortLeverage: currentConfig.shortLeverage || '50',
+              shortMargin: currentConfig.shortMargin || '3',
+              defaultLimit: currentConfig.defaultLimit || String(limit), // 保持数据库中的值不变
+              ignoredSymbols: newIgnoredList,
+              takeProfit: currentConfig.takeProfit || null,
+              stopLoss: currentConfig.stopLoss || null,
+              copytradingMode: currentConfig.copytradingMode || false,
+              copytradingApiKey: currentConfig.copytradingApiKey || null,
+              copytradingApiSecret: currentConfig.copytradingApiSecret || null,
+            }),
+          });
+          
+          if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || '解除忽略失败');
+          }
+          
+          const result = await res.json();
+          
+          // 更新本地缓存（只更新 ignoredSymbols，不改变其他字段，特别是 defaultLimit）
+          const cachedConfig = userConfigStorage.get();
+          userConfigStorage.set({
+            ...cachedConfig,
+            ignoredSymbols: newIgnoredList,
+          });
+          
+          // 更新状态（只更新 ignoredSymbols，不改变 limit）
+          setUserConfig(prev => ({
+            ...prev!,
+            ignoredSymbols: newIgnoredList,
+          }));
+          
+          console.log(`✓ 已将 ${coinSymbol} 从忽略列表移除`);
+        } catch (error) {
+          console.error('解除忽略失败:', error);
+          setErrorMessage(error instanceof Error ? error.message : '解除忽略失败');
+          setErrorModalOpen(true);
+        }
+      },
+    });
+    setConfirmOpen(true);
+  };
+
   const handleAddMargin = async (symbol: string, side: 'LONG' | 'SHORT') => {
     const sideText = side === 'LONG' ? '做多' : '做空';
     
@@ -1167,6 +1345,8 @@ export default function BinancePage() {
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
                   positions={positions}
                   onClosePosition={handleClosePositions}
+                  onAddToIgnore={handleAddToIgnore}
+                  onRemoveFromIgnore={handleRemoveFromIgnore}
                 />
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">
@@ -1187,6 +1367,8 @@ export default function BinancePage() {
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
                   positions={positions}
                   onClosePosition={handleClosePositions}
+                  onAddToIgnore={handleAddToIgnore}
+                  onRemoveFromIgnore={handleRemoveFromIgnore}
                 />
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">
@@ -1207,6 +1389,8 @@ export default function BinancePage() {
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
                   positions={positions}
                   onClosePosition={handleClosePositions}
+                  onAddToIgnore={handleAddToIgnore}
+                  onRemoveFromIgnore={handleRemoveFromIgnore}
                 />
               </div>
             </div>
@@ -1324,6 +1508,8 @@ export default function BinancePage() {
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
                   positions={positions}
                   onClosePosition={handleClosePositions}
+                  onAddToIgnore={handleAddToIgnore}
+                  onRemoveFromIgnore={handleRemoveFromIgnore}
                 />
               </div>
             )}
@@ -1348,6 +1534,8 @@ export default function BinancePage() {
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
                   positions={positions}
                   onClosePosition={handleClosePositions}
+                  onAddToIgnore={handleAddToIgnore}
+                  onRemoveFromIgnore={handleRemoveFromIgnore}
                 />
               </div>
             )}
@@ -1372,6 +1560,8 @@ export default function BinancePage() {
                   ignoredSymbols={userConfig?.ignoredSymbols || ''}
                   positions={positions}
                   onClosePosition={handleClosePositions}
+                  onAddToIgnore={handleAddToIgnore}
+                  onRemoveFromIgnore={handleRemoveFromIgnore}
                 />
               </div>
             )}

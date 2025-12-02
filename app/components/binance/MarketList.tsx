@@ -2,13 +2,14 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, DollarSign, Zap, X } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Zap, X, Ban, CheckCircle2 } from 'lucide-react';
 
 interface MarketItem {
   symbol: string;
   price: number;
   change: number;
   volume: number;
+  volumeFormatted?: string;
   marketCap?: number;
   marketCapFormatted?: string;
   rank?: number;
@@ -45,6 +46,8 @@ interface MarketListProps {
   ignoredSymbols?: string; // 忽略的币种列表（空格分隔）
   positions?: Position[]; // 持仓列表
   onClosePosition?: (symbol: string) => void; // 平仓回调
+  onAddToIgnore?: (symbol: string) => void; // 添加到忽略列表回调
+  onRemoveFromIgnore?: (symbol: string) => void; // 从忽略列表移除回调
 }
 
 export const MarketList: React.FC<MarketListProps> = ({ 
@@ -63,7 +66,9 @@ export const MarketList: React.FC<MarketListProps> = ({
   onAddMargin,
   ignoredSymbols = '',
   positions = [],
-  onClosePosition
+  onClosePosition,
+  onAddToIgnore,
+  onRemoveFromIgnore
 }) => {
   const isLong = type === 'market' || type === 'loser';
   const isLoser = type === 'loser';
@@ -82,6 +87,14 @@ export const MarketList: React.FC<MarketListProps> = ({
     // 先格式化为6位小数，然后用parseFloat去掉末尾的0
     const formatted = parseFloat(price.toFixed(6));
     return formatted;
+  };
+
+  // 格式化交易量
+  const formatVolume = (num: number) => {
+    if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+    if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+    if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
+    return num.toFixed(2);
   };
 
   // 获取忽略的币种列表（使用传入的 prop）
@@ -189,7 +202,7 @@ export const MarketList: React.FC<MarketListProps> = ({
                           {type === 'market' && item.marketCapFormatted ? (
                             <div className="text-xs text-gray-400 mt-0.5">市值: ${item.marketCapFormatted}</div>
                           ) : (
-                            <div className="text-xs text-gray-400 mt-0.5">Vol: ${(item as any).volumeFormatted}</div>
+                            <div className="text-xs text-gray-400 mt-0.5">Vol: ${item.volumeFormatted || formatVolume(item.volume)}</div>
                           )}
                         </>
                       )}
@@ -229,11 +242,26 @@ export const MarketList: React.FC<MarketListProps> = ({
                         </button>
                       </div>
                     ) : isSymbolIgnored(item.symbol) ? (
-                      <span className="px-2 py-1 rounded-lg font-bold text-xs bg-gray-100 text-gray-500 whitespace-nowrap" title="已被添加到忽略列表">
-                        已忽略
-                      </span>
+                      <button
+                        onClick={() => onRemoveFromIgnore?.(item.symbol)}
+                        disabled={isTrading}
+                        className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-gray-500 hover:bg-gray-600"
+                        title="取消拉黑"
+                      >
+                        <CheckCircle2 className="w-2.5 h-2.5" />
+                        取消拉黑
+                      </button>
                     ) : (
                       <div className="flex gap-1 items-center">
+                        <button
+                          onClick={() => onAddToIgnore?.(item.symbol)}
+                          disabled={isTrading}
+                          className="px-2 py-1 rounded-lg font-bold text-xs text-white flex items-center gap-0.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap bg-gray-800 hover:bg-gray-900"
+                          title="添加到忽略列表"
+                        >
+                          <Ban className="w-2.5 h-2.5" />
+                          黑
+                        </button>
                         <button
                           onClick={() => onOpenPosition?.(item.symbol, 'LONG')}
                           disabled={isTrading}
@@ -284,7 +312,7 @@ export const MarketList: React.FC<MarketListProps> = ({
                           {type === 'market' && item.marketCapFormatted ? (
                             <span className="text-gray-500 font-bold">市值: ${item.marketCapFormatted}</span>
                           ) : (
-                            <span className="text-gray-500">Vol: ${(item as any).volumeFormatted}</span>
+                            <span className="text-gray-500">Vol: ${item.volumeFormatted || formatVolume(item.volume)}</span>
                           )}
                         </>
                       )}
@@ -324,11 +352,26 @@ export const MarketList: React.FC<MarketListProps> = ({
                       </button>
                     </div>
                   ) : isSymbolIgnored(item.symbol) ? (
-                    <span className="px-3 py-1.5 rounded-lg font-bold text-sm bg-gray-100 text-gray-500" title="已被添加到忽略列表">
-                      已忽略
-                    </span>
+                    <button
+                      onClick={() => onRemoveFromIgnore?.(item.symbol)}
+                      disabled={isTrading}
+                      className="px-3 py-1.5 rounded-lg font-bold text-sm text-white flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 bg-gray-500 hover:bg-gray-600"
+                      title="取消拉黑"
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
+                      取消拉黑
+                    </button>
                   ) : (
                     <div className="flex gap-2 items-center">
+                      <button
+                        onClick={() => onAddToIgnore?.(item.symbol)}
+                        disabled={isTrading}
+                        className="px-3 py-1.5 rounded-lg font-bold text-sm text-white flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 bg-gray-800 hover:bg-gray-900"
+                        title="添加到忽略列表"
+                      >
+                        <Ban className="w-3 h-3" />
+                        黑
+                      </button>
                       <button
                         onClick={() => onOpenPosition?.(item.symbol, 'LONG')}
                         disabled={isTrading}
