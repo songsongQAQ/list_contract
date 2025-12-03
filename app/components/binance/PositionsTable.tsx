@@ -1,8 +1,39 @@
 'use client';
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
 import { Wallet, ArrowUpRight, ArrowDownRight, X, Trash2, TrendingUp, TrendingDown, RefreshCw, Zap } from 'lucide-react';
+import { Statistic } from 'antd';
+
+// 动画数字组件：使用 Framer Motion 实现平滑的数字变化动画
+// 只实现数字滚动效果，不添加缩放动画，避免每次值变化都放大
+const AnimatedNumber: React.FC<{ value: number; precision?: number; prefix?: string }> = ({ value, precision = 2, prefix = '' }) => {
+  const motionValue = useMotionValue(value);
+  const spring = useSpring(motionValue, {
+    damping: 30,
+    stiffness: 200,
+  });
+  const [displayValue, setDisplayValue] = useState(value);
+
+  useEffect(() => {
+    motionValue.set(value);
+  }, [value, motionValue]);
+
+  useEffect(() => {
+    const unsubscribe = spring.on('change', (latest) => {
+      setDisplayValue(latest);
+    });
+    return () => unsubscribe();
+  }, [spring]);
+
+  const formattedValue = parseFloat(displayValue.toFixed(precision));
+
+  return (
+    <span style={{ display: 'inline-block' }}>
+      {prefix}{formattedValue}
+    </span>
+  );
+};
 
 interface Position {
   symbol: string;
@@ -139,24 +170,83 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
 
         {/* Stats Cards */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-gray-50 rounded-2xl p-3 border border-gray-200">
-            <p className="text-gray-500 text-[11px] font-bold uppercase tracking-wider mb-1">总盈亏</p>
-            <p className={`text-base font-black tracking-tight ${totalPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {totalPnl > 0 ? '+' : ''}{totalPnl.toFixed(2)}
-            </p>
-          </div>
-          <div className="bg-green-50/50 rounded-2xl p-3 border border-green-200/60">
-            <p className="text-green-700/70 text-[11px] font-bold uppercase tracking-wider mb-1">多单盈亏</p>
-            <p className={`text-base font-black tracking-tight ${totalLongPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {totalLongPnl > 0 ? '+' : ''}{totalLongPnl.toFixed(2)}
-            </p>
-          </div>
-          <div className="bg-red-50/50 rounded-2xl p-3 border border-red-200/60">
-            <p className="text-red-700/70 text-[11px] font-bold uppercase tracking-wider mb-1">空单盈亏</p>
-            <p className={`text-base font-black tracking-tight ${totalShortPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {totalShortPnl > 0 ? '+' : ''}{totalShortPnl.toFixed(2)}
-            </p>
-          </div>
+          {/* 总盈亏 */}
+          <motion.div 
+            className="bg-gray-50 rounded-2xl p-3 border border-gray-200"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Statistic
+              title={<span className="text-gray-500 text-[11px] font-bold uppercase tracking-wider">总盈亏</span>}
+              value={totalPnl}
+              formatter={(value) => (
+                <AnimatedNumber 
+                  value={typeof value === 'number' ? value : totalPnl} 
+                  precision={2} 
+                  prefix={totalPnl > 0 ? '+' : ''} 
+                />
+              )}
+              valueStyle={{
+                color: totalPnl >= 0 ? '#16a34a' : '#dc2626',
+                fontSize: '16px',
+                fontWeight: 900,
+                letterSpacing: '-0.025em',
+              }}
+            />
+          </motion.div>
+          
+          {/* 多单盈亏 */}
+          <motion.div 
+            className="bg-green-50/50 rounded-2xl p-3 border border-green-200/60"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.05 }}
+          >
+            <Statistic
+              title={<span className="text-green-700/70 text-[11px] font-bold uppercase tracking-wider">多单盈亏</span>}
+              value={totalLongPnl}
+              formatter={(value) => (
+                <AnimatedNumber 
+                  value={typeof value === 'number' ? value : totalLongPnl} 
+                  precision={2} 
+                  prefix={totalLongPnl > 0 ? '+' : ''} 
+                />
+              )}
+              valueStyle={{
+                color: totalLongPnl >= 0 ? '#16a34a' : '#dc2626',
+                fontSize: '16px',
+                fontWeight: 900,
+                letterSpacing: '-0.025em',
+              }}
+            />
+          </motion.div>
+          
+          {/* 空单盈亏 */}
+          <motion.div 
+            className="bg-red-50/50 rounded-2xl p-3 border border-red-200/60"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.1 }}
+          >
+            <Statistic
+              title={<span className="text-red-700/70 text-[11px] font-bold uppercase tracking-wider">空单盈亏</span>}
+              value={totalShortPnl}
+              formatter={(value) => (
+                <AnimatedNumber 
+                  value={typeof value === 'number' ? value : totalShortPnl} 
+                  precision={2} 
+                  prefix={totalShortPnl > 0 ? '+' : ''} 
+                />
+              )}
+              valueStyle={{
+                color: totalShortPnl >= 0 ? '#16a34a' : '#dc2626',
+                fontSize: '16px',
+                fontWeight: 900,
+                letterSpacing: '-0.025em',
+              }}
+            />
+          </motion.div>
         </div>
       </div>
 

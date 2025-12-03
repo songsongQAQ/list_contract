@@ -578,6 +578,46 @@ npm install -g pm2
 pm2 start npm --name "garson" -- start
 ```
 
+### 🚀 使用部署脚本自动上传
+
+项目提供了自动化部署脚本，可以一键构建并上传 `.next` 目录到服务器。
+
+**前提条件**：
+- 已安装项目依赖（`npm install`）
+- 服务器 SSH 连接信息已配置在脚本中
+
+**使用方法**：
+
+```bash
+# 一键构建并部署（推荐）
+npm run deploy
+
+# 或者手动执行
+npm run build
+tsx scripts/deploy.ts
+```
+
+**部署脚本功能**：
+- ✅ 自动检查本地构建文件是否存在
+- ✅ 连接到远程服务器（SSH）
+- ✅ 自动创建远程目录（如果不存在）
+- ✅ 清理旧的构建文件
+- ✅ 上传 `.next` 目录到服务器
+- ✅ 验证上传结果
+
+**服务器配置**：
+部署脚本默认配置：
+- 服务器 IP: `35.241.124.131`
+- 用户名: `root`
+- 目标目录: `/www/wwwroot/list_contract`
+
+如需修改服务器配置，请编辑 `scripts/deploy.ts` 文件中的 `serverConfig` 和 `config` 对象。
+
+**注意事项**：
+- ⚠️ 部署脚本会覆盖服务器上的 `.next` 目录
+- ⚠️ 确保服务器目录 `/www/wwwroot/list_contract` 有写入权限
+- ⚠️ 首次部署前，请确保服务器上已安装 Node.js 和必要的依赖
+
 ### ⚙️ 部署注意事项
 
 | 项目 | 说明 |
