@@ -4,12 +4,30 @@
  */
 
 import { scSend } from 'serverchan-sdk';
+import TelegramBot from 'node-telegram-bot-api';
 
 /**
  * ServerChan 推送配置
  * 建议：将 SENDKEY 存储在环境变量中，更安全
  */
-const SERVERCHAN_SENDKEY = process.env.SERVERCHAN_SENDKEY || 'sctp256tbhquqjqhxiqtviutjfscsq';
+const SERVERCHAN_SENDKEY = process.env.SERVERCHAN_SENDKEY ;
+
+/**
+ * Telegram Bot 配置
+ */
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8565986945:AAGs0B8uYzLXoE-7FzNc2XIyJ0bR-0_Rl5g';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || ''; // 群组 ID，需要从环境变量配置
+
+// 初始化 Telegram Bot（如果配置了 Token）
+let telegramBot: TelegramBot | null = null;
+if (TELEGRAM_BOT_TOKEN) {
+  try {
+    telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
+    console.log('✅ Telegram Bot 初始化成功');
+  } catch (error) {
+    console.error('❌ Telegram Bot 初始化失败:', error);
+  }
+}
 
 /**
  * 价格历史数据存储
@@ -296,6 +314,41 @@ async function sendAlert(
     }
   } catch (error: any) {
     console.error(`❌ ServerChan ${typeText}推送异常:`, error.message);
+  }
+  
+  // 发送 Telegram 推送
+  if (telegramBot && TELEGRAM_CHAT_ID) {
+    try {
+      // 构建 Telegram 消息（使用 Markdown 格式）
+      let telegramMessage = `${alertEmoji} *${typeText}预警通知*\n\n`;
+      telegramMessage += `*⏰ 时间:* ${now}\n\n`;
+      telegramMessage += `*💰 币种:* *${symbol}*\n\n`;
+      telegramMessage += `*💵 当前价格:* *$${currentPrice.toFixed(4)}*\n\n`;
+      telegramMessage += `━━━━━━━━━━━━━━━━\n\n`;
+      telegramMessage += `*${typeEmoji} ${typeText}详情*\n\n`;
+      
+      // 按照1分钟、5分钟、10分钟的顺序显示
+      alerts.forEach((alert, index) => {
+        const changeValue = alert.value.toFixed(2);
+        const emoji = index === 0 ? '🔥' : '📊';
+        const sign = alert.value >= 0 ? '+' : '';
+        telegramMessage += `${emoji} *${alert.period}${typeText}:*\n`;
+        telegramMessage += `\`${sign}${changeValue}%\`\n\n`;
+      });
+      
+      telegramMessage += `━━━━━━━━━━━━━━━━\n\n`;
+      telegramMessage += `⚠️ *${riskText}*`;
+      
+      await telegramBot.sendMessage(TELEGRAM_CHAT_ID, telegramMessage, {
+        parse_mode: 'Markdown',
+      });
+      
+      console.log(`✅ Telegram ${typeText}推送成功`);
+    } catch (error: any) {
+      console.error(`❌ Telegram ${typeText}推送异常:`, error.message);
+    }
+  } else if (!TELEGRAM_CHAT_ID) {
+    console.log(`⚠️ Telegram Chat ID 未配置，跳过 Telegram 推送`);
   }
   
   console.log('');
