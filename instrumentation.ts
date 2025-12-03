@@ -19,6 +19,28 @@ const SERVERCHAN_SENDKEY = process.env.SERVERCHAN_SENDKEY || 'sctp256tbhquqjqhxi
 const priceHistory = new Map<string, Array<{ timestamp: number; price: number }>>();
 
 /**
+ * 推送记录存储
+ * 结构: Map<币种符号, 最后推送时间戳>
+ * 用于防止5分钟内重复推送
+ */
+const pushHistory = new Map<string, number>();
+
+/**
+ * 清理超过5分钟的推送记录
+ */
+function cleanPushHistory() {
+  const now = Date.now();
+  const fiveMinutesAgo = now - 5 * 60 * 1000; // 5分钟前的时间戳
+
+  pushHistory.forEach((lastPushTime, symbol) => {
+    // 如果最后推送时间超过5分钟，删除记录
+    if (lastPushTime < fiveMinutesAgo) {
+      pushHistory.delete(symbol);
+    }
+  });
+}
+
+/**
  * 清理超过10分钟的历史数据
  */
 function cleanOldData() {
@@ -100,91 +122,6 @@ function calculateChange(symbol: string, currentPrice: number, minutesAgo: numbe
 }
 
 /**
- * 测试推送功能 - 模拟推送第一个币种
- */
-async function testPush() {
-  try {
-    const now = new Date().toLocaleString('zh-CN', { 
-      timeZone: 'Asia/Shanghai',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-    
-    // 模拟第一个币种的数据，按照1分钟、5分钟、10分钟的顺序
-    const testSymbol = 'BTC';
-    const testPrice = 43250.50;
-    const testAlerts = [
-      { period: '1分钟', value: 12.35, order: 1 },
-      { period: '5分钟', value: 15.67, order: 2 },
-      { period: '10分钟', value: 18.92, order: 3 }
-    ];
-    
-    // 按照1分钟、5分钟、10分钟的顺序排序
-    testAlerts.sort((a, b) => a.order - b.order);
-    
-    // 构建推送标题，按优先级只显示一个涨幅（优先级：1分钟 > 5分钟 > 10分钟）
-    const titleChange = `1分钟+${testAlerts[0].value.toFixed(2)}%`; // 测试数据中1分钟总是存在
-    const title = `🚨 ${testSymbol} ${titleChange}`;
-    
-    // 构建推送内容，使用纯 Markdown 格式突出涨幅
-    let desp = `## 🚨 涨幅预警通知（测试）\n\n`;
-    desp += `**⏰ 时间:** ${now}\n\n`;
-    desp += `**💰 币种:** **${testSymbol}**\n\n`;
-    desp += `**💵 当前价格:** **$${testPrice.toFixed(4)}**\n\n`;
-    desp += `---\n\n`;
-    desp += `## 📈 涨幅详情\n\n`;
-    
-    // 按照1分钟、5分钟、10分钟的顺序显示
-    testAlerts.forEach((alert, index) => {
-      const changeValue = alert.value.toFixed(2);
-      const emoji = index === 0 ? '🔥' : '📊';
-      // 使用大标题和代码块来突出涨幅数字
-      desp += `### ${emoji} ${alert.period}涨幅\n\n`;
-      desp += `\`\`\`\n+${changeValue}%\n\`\`\`\n\n`;
-    });
-    
-    desp += `---\n\n`;
-    desp += `### ⚠️ 这是一条测试推送消息`;
-    
-    console.log('\n🧪 ========== 测试推送 ==========');
-    console.log(`⏰ 时间: ${now}`);
-    console.log(`💰 币种: ${testSymbol}`);
-    console.log(`💵 当前价格: $${testPrice.toFixed(4)}`);
-    console.log(`📈 涨幅情况:`);
-    testAlerts.forEach((alert, index) => {
-      const emoji = index === 0 ? '🔥' : '📊';
-      console.log(`   ${emoji} ${alert.period}涨幅: +${alert.value.toFixed(2)}%`);
-    });
-    console.log('─'.repeat(60));
-    
-    // 发送 ServerChan 推送
-    const response = await scSend(
-      SERVERCHAN_SENDKEY,
-      title,
-      desp,
-      { tags: '涨幅预警|币种监控|测试' }
-    );
-    
-    if (response.code === 0) {
-      console.log('✅ ServerChan 测试推送成功');
-    } else {
-      console.error('❌ ServerChan 测试推送失败:', response.message || '未知错误');
-    }
-    
-    console.log('');
-  } catch (error: any) {
-    console.error('❌ ServerChan 测试推送异常:', error.message);
-    if (error.stack) {
-      console.error('错误堆栈:', error.stack);
-    }
-  }
-}
-
-/**
  * 检查涨跌幅条件并推送
  * @param symbol 币种符号
  * @param currentPrice 当前价格
@@ -244,6 +181,27 @@ async function sendAlert(
   type: 'gain' | 'loss',
   threshold: number
 ) {
+  // 清理超过5分钟的推送记录
+  cleanPushHistory();
+  
+  // 检查是否在5分钟内推送过
+  const nowTimestamp = Date.now();
+  const lastPushTime = pushHistory.get(symbol);
+  
+  if (lastPushTime !== undefined) {
+    const timeSinceLastPush = nowTimestamp - lastPushTime;
+    const fiveMinutes = 5 * 60 * 1000; // 5分钟的毫秒数
+    
+    if (timeSinceLastPush < fiveMinutes) {
+      const remainingMinutes = ((fiveMinutes - timeSinceLastPush) / 1000 / 60).toFixed(1);
+      console.log(`⏭️  ${symbol} 在${remainingMinutes}分钟内已推送过，跳过本次推送`);
+      return; // 5分钟内已推送过，跳过
+    }
+  }
+  
+  // 记录本次推送时间
+  pushHistory.set(symbol, nowTimestamp);
+  
   const now = new Date().toLocaleString('zh-CN', { 
     timeZone: 'Asia/Shanghai',
     year: 'numeric',
@@ -385,16 +343,6 @@ async function fetchAndPrintTopGainers() {
       };
     });
 
-    // 处理市值榜单
-    const topMarket = (data.topMarket || []).slice(0, 20).map((item: any) => {
-      // 提取币种符号（如 BTC/USDT:USDT -> BTC）
-      const coinSymbol = item.symbol.split('/')[0];
-      return {
-        symbol: coinSymbol,
-        price: item.price,
-        change: item.change,
-      };
-    });
 
     // 存储价格数据并检查涨幅条件（涨幅榜单，阈值10%）
     for (const coin of topGainers) {
@@ -457,16 +405,10 @@ export async function register() {
 
     console.log('✅ 定时任务已启动：每10秒获取涨幅榜单前20');
     
-    // 先测试推送一次
-    setTimeout(async () => {
-      console.log('🧪 开始测试推送功能...');
-      await testPush();
-    }, 2000); // 等待 2 秒后测试推送
-    
     // 延迟执行第一次，等待服务器启动完成
     setTimeout(async () => {
       await fetchAndPrintTopGainers();
-    }, 5000); // 等待 5 秒让服务器启动后再获取数据
+    }, 3000); // 等待 3 秒让服务器启动后再获取数据
   }
 }
 
