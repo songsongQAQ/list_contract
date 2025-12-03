@@ -298,22 +298,26 @@ async function sendAlert(
   console.log('─'.repeat(60));
   
   // 发送 ServerChan 推送
-  try {
-    const tags = isGain ? '涨幅预警|币种监控' : '跌幅预警|币种监控';
-    const response = await scSend(
-      SERVERCHAN_SENDKEY,
-      title,
-      desp,
-      { tags }
-    );
-    
-    if (response.code === 0) {
-      console.log(`✅ ServerChan ${typeText}推送成功`);
-    } else {
-      console.error(`❌ ServerChan ${typeText}推送失败:`, response.message || '未知错误');
+  if (SERVERCHAN_SENDKEY) {
+    try {
+      const tags = isGain ? '涨幅预警|币种监控' : '跌幅预警|币种监控';
+      const response = await scSend(
+        SERVERCHAN_SENDKEY,
+        title,
+        desp,
+        { tags }
+      );
+      
+      if (response.code === 0) {
+        console.log(`✅ ServerChan ${typeText}推送成功`);
+      } else {
+        console.error(`❌ ServerChan ${typeText}推送失败:`, response.message || '未知错误');
+      }
+    } catch (error: any) {
+      console.error(`❌ ServerChan ${typeText}推送异常:`, error.message);
     }
-  } catch (error: any) {
-    console.error(`❌ ServerChan ${typeText}推送异常:`, error.message);
+  } else {
+    console.log(`⚠️ ServerChan SendKey 未配置，跳过 ServerChan 推送`);
   }
   
   // 发送 Telegram 推送
