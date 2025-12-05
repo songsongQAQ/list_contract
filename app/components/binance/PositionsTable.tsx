@@ -187,11 +187,13 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                   prefix={totalPnl > 0 ? '+' : ''} 
                 />
               )}
-              valueStyle={{
-                color: totalPnl >= 0 ? '#16a34a' : '#dc2626',
-                fontSize: '16px',
-                fontWeight: 900,
-                letterSpacing: '-0.025em',
+              styles={{
+                content: {
+                  color: totalPnl >= 0 ? '#16a34a' : '#dc2626',
+                  fontSize: '16px',
+                  fontWeight: 900,
+                  letterSpacing: '-0.025em',
+                }
               }}
             />
           </motion.div>
@@ -213,11 +215,13 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                   prefix={totalLongPnl > 0 ? '+' : ''} 
                 />
               )}
-              valueStyle={{
-                color: totalLongPnl >= 0 ? '#16a34a' : '#dc2626',
-                fontSize: '16px',
-                fontWeight: 900,
-                letterSpacing: '-0.025em',
+              styles={{
+                content: {
+                  color: totalLongPnl >= 0 ? '#16a34a' : '#dc2626',
+                  fontSize: '16px',
+                  fontWeight: 900,
+                  letterSpacing: '-0.025em',
+                }
               }}
             />
           </motion.div>
@@ -239,11 +243,13 @@ export const PositionsTable: React.FC<PositionsTableProps> = ({ positions, onClo
                   prefix={totalShortPnl > 0 ? '+' : ''} 
                 />
               )}
-              valueStyle={{
-                color: totalShortPnl >= 0 ? '#16a34a' : '#dc2626',
-                fontSize: '16px',
-                fontWeight: 900,
-                letterSpacing: '-0.025em',
+              styles={{
+                content: {
+                  color: totalShortPnl >= 0 ? '#16a34a' : '#dc2626',
+                  fontSize: '16px',
+                  fontWeight: 900,
+                  letterSpacing: '-0.025em',
+                }
               }}
             />
           </motion.div>

@@ -771,6 +771,21 @@ A: 这通常是由 Framer Motion 动画库导致的指针事件问题。
    - 检查浏览器控制台是否有错误
 ```
 
+#### Q: 更新用户配置时报错 "Expected String, provided Int"
+```
+A: 这是 Prisma 类型检查错误，原因是数值字段没有被正确转换为字符串。
+   
+   原因：Prisma Schema 中定义 longMargin、shortMargin 等字段为 String 类型，
+   但 API 接收到的是整数值，导致类型不匹配。
+   
+   已应用的修复（v2.3.2+）：
+   1. 在 API 路由中对所有数值字段添加 String() 转换
+   2. 位置：app/api/admin/users/[id]/config/route.ts
+   3. 位置：app/api/user/config/route.ts
+   
+   详细信息请查看：PRISMA_TYPE_FIX.md
+```
+
 #### Q: 补仓失败
 ```
 A: 可能原因：
@@ -840,14 +855,24 @@ A: 可能原因：
 
 | 信息 | 值 |
 |------|-----|
-| 📦 **版本** | 2.2.0 |
-| 📅 **最后更新** | 2025-11-28 |
+| 📦 **版本** | 2.3.3 |
+| 📅 **最后更新** | 2025-12-05 |
 | ✅ **状态** | 生产就绪 |
 | 🌟 **核心特性** | 用户认证、数据库持久化、后台管理、补仓功能 |
 
 ---
 
 ## 🆕 更新日志
+
+### v2.3.3 (2025-12-05)
+- 🐛 **修复 Ant Design 弃用警告**：将 Statistic 组件的 `valueStyle` 替换为 `styles.content`
+- ✅ **兼容 Ant Design 6.0+**：使用新的样式 API，消除控制台警告信息
+- 📍 **修改位置**：PositionsTable 组件中的三个 Statistic 组件（总盈亏、多单盈亏、空单盈亏）
+
+### v2.3.2 (2025-12-05)
+- 🐛 **修复 Prisma 类型错误**：修复用户配置保存时的数据类型不匹配问题
+- ✅ **String 类型转换**：对 longMargin、shortMargin、defaultLimit 等字段添加类型转换
+- 📝 **新增文档**：添加 PRISMA_TYPE_FIX.md 说明修复详情
 
 ### v2.3.1 (2025-12-01)
 - ✨ **双开一键操作**：榜单头部同时显示"一键做多"和"一键做空"两个按钮，支持灵活批量操作

@@ -4,13 +4,12 @@
  */
 
 import { scSend } from 'serverchan-sdk';
-import TelegramBot from 'node-telegram-bot-api';
 
 /**
  * ServerChan 推送配置
  * 建议：将 SENDKEY 存储在环境变量中，更安全
  */
-const SERVERCHAN_SENDKEY = process.env.SERVERCHAN_SENDKEY ;
+const SERVERCHAN_SENDKEY = process.env.SERVERCHAN_SENDKEY;
 
 /**
  * Telegram Bot 配置
@@ -18,16 +17,8 @@ const SERVERCHAN_SENDKEY = process.env.SERVERCHAN_SENDKEY ;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8565986945:AAGs0B8uYzLXoE-7FzNc2XIyJ0bR-0_Rl5g';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || ''; // 群组 ID，需要从环境变量配置
 
-// 初始化 Telegram Bot（如果配置了 Token）
-let telegramBot: TelegramBot | null = null;
-if (TELEGRAM_BOT_TOKEN) {
-  try {
-    telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
-    console.log('✅ Telegram Bot 初始化成功');
-  } catch (error) {
-    console.error('❌ Telegram Bot 初始化失败:', error);
-  }
-}
+// Telegram Bot 实例（延迟初始化，避免在模块顶层导入 Node.js 专用模块）
+let telegramBot: any = null;
 
 /**
  * 价格历史数据存储
@@ -353,6 +344,8 @@ async function sendAlert(
     }
   } else if (!TELEGRAM_CHAT_ID) {
     console.log(`⚠️ Telegram Chat ID 未配置，跳过 Telegram 推送`);
+  } else if (!telegramBot) {
+    console.log(`⚠️ Telegram Bot 未初始化，跳过 Telegram 推送`);
   }
   
   console.log('');
@@ -453,7 +446,19 @@ async function fetchAndPrintTopGainers() {
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    // 动态导入 Node.js 专用模块，避免在 Edge Runtime 中执行
     const cron = await import('node-cron');
+    
+    // 初始化 Telegram Bot（仅在 Node.js 运行时初始化）
+    if (TELEGRAM_BOT_TOKEN) {
+      try {
+        const TelegramBot = (await import('node-telegram-bot-api')).default;
+        telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
+        console.log('✅ Telegram Bot 初始化成功');
+      } catch (error) {
+        console.error('❌ Telegram Bot 初始化失败:', error);
+      }
+    }
 
     // 每10秒执行一次（使用秒级精度：秒 分 时 日 月 周）
     cron.schedule('*/10 * * * * *', async () => {
