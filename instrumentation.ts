@@ -445,6 +445,7 @@ async function fetchAndPrintTopGainers() {
 }
 
 export async function register() {
+  return;
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     // 动态导入 Node.js 专用模块，避免在 Edge Runtime 中执行
     const cron = await import('node-cron');
