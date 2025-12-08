@@ -37,37 +37,18 @@
  * - env_production: 生产环境变量
  * - env_development: 开发环境变量
  */
-
+import { version } from './package.json';
 module.exports = {
   apps: [
     {
       // ==================== 基础配置 ====================
       name: 'garson',
+      version,
+      exec_mode: 'cluster',
       script: "node_modules/next/dist/bin/next",
-      args: "start -p 3000",
-      cwd: "./",
-      env: {
-        NODE_ENV: "production"
-      },
-      // ==================== 进程管理 ====================
-      autorestart: true,               // 崩溃自动重启
-      watch: false,                    // 生产环境不监听文件变化
-      max_memory_restart: '1024M',     // 内存超过 1GB 自动重启
-      
-      // ==================== 日志配置 ====================
-      error_file: './logs/error.log',
-      out_file: './logs/out.log',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-
-      // ==================== 监控和告警 ====================
-      max_restarts: 10,                // 最大重启次数
-      min_uptime: 10000,               // 最小运行时间（毫秒），低于此值视为启动失败
-
-      // ==================== 其他配置 ====================
-      merge_logs: false,               // 不合并日志
+      args: "start",
       autorestart: true,
-      watch: ['app', 'lib', 'next.config.ts'],  // 监听这些文件变化（可选）
-      ignore_watch: ['node_modules', '.next', 'logs', '.git'],
+      instances: 'max',
     }
   ]
 };
