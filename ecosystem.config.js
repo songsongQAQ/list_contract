@@ -43,14 +43,12 @@ module.exports = {
     {
       // ==================== 基础配置 ====================
       name: 'garson',
-      script: 'npm',
-      args: 'start',
-      cwd: '.',
-
-      // ==================== 执行方式 ====================
-      instances: 1,                    // 实例数量：2 个进程（根据你的 CPU 核数调整）
-      exec_mode: 'cluster',            // 集群模式：多个进程负载均衡
-
+      script: "node_modules/next/dist/bin/next",
+      args: "start -p 3000",
+      cwd: "./",
+      env: {
+        NODE_ENV: "production"
+      },
       // ==================== 进程管理 ====================
       autorestart: true,               // 崩溃自动重启
       watch: false,                    // 生产环境不监听文件变化
@@ -60,21 +58,6 @@ module.exports = {
       error_file: './logs/error.log',
       out_file: './logs/out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-
-      // ==================== 环境变量 ====================
-      env_production: {
-        NODE_ENV: 'production',
-        PORT: 3000,
-      },
-      env_development: {
-        NODE_ENV: 'development',
-        PORT: 3000,
-      },
-
-      // ==================== 启动延迟 ====================
-      wait_ready: false,
-      listen_timeout: 3000,            // 启动超时时间（毫秒）
-      kill_timeout: 5000,              // 关闭超时时间（毫秒）
 
       // ==================== 监控和告警 ====================
       max_restarts: 10,                // 最大重启次数
