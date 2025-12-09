@@ -95,6 +95,51 @@ export async function GET(request: NextRequest) {
           }
           usdtBalance = usdtBalance || 0;
 
+          // 先一次性查询所有 Algo Orders（优化：避免多次 API 调用）
+          let allAlgoOrders: any[] = [];
+          try {
+            const baseUrl = 'https://fapi.binance.com';
+            const params: Record<string, string> = {
+              timestamp: Date.now().toString(),
+              recvWindow: '60000'
+            };
+            
+            const queryString = new URLSearchParams(params).toString();
+            const signature = require('crypto')
+              .createHmac('sha256', credentials.apiSecret)
+              .update(queryString)
+              .digest('hex');
+            
+            const url = `${baseUrl}/fapi/v1/openAlgoOrders?${queryString}&signature=${signature}`;
+            const response = await fetch(url, {
+              method: 'GET',
+              headers: {
+                'X-MBX-APIKEY': credentials.apiKey,
+              }
+            });
+            
+            if (response.ok) {
+              allAlgoOrders = await response.json();
+            } else {
+              const errorText = await response.text();
+              console.warn(`[Algo Orders] API error ${response.status}:`, errorText);
+            }
+          } catch (error) {
+            console.warn(`[Algo Orders] Failed to fetch:`, error);
+          }
+          
+          // 按 symbol 分组 Algo Orders（提高查找效率）
+          const algoOrdersBySymbol = new Map<string, any[]>();
+          if (allAlgoOrders && Array.isArray(allAlgoOrders)) {
+            for (const order of allAlgoOrders) {
+              const symbol = order.symbol;
+              if (!algoOrdersBySymbol.has(symbol)) {
+                algoOrdersBySymbol.set(symbol, []);
+              }
+              algoOrdersBySymbol.get(symbol)!.push(order);
+            }
+          }
+
           // 处理持仓数据
           const activePositions = await Promise.all(
             positions
@@ -121,24 +166,25 @@ export async function GET(request: NextRequest) {
                 const margin = initialMarginValue || (positionNotional / leverage);
                 const side = parseFloat(p.info.positionAmt) > 0 ? 'LONG' : 'SHORT';
                 
-                // 获取止盈止损价格
+                // 获取止盈止损价格（从内存中的 Map 查找，避免重复 API 调用）
                 let takeProfitPrice = null;
                 let stopLossPrice = null;
                 
-                try {
-                  const openOrders = await client.fetchOpenOrders(p.symbol);
-                  for (const order of openOrders) {
-                    const orderInfo = order.info || {};
-                    if (orderInfo.positionSide === side) {
-                      if (orderInfo.type === 'TAKE_PROFIT_MARKET' || orderInfo.type === 'TAKE_PROFIT') {
-                        takeProfitPrice = parseFloat(orderInfo.stopPrice);
-                      } else if (orderInfo.type === 'STOP_MARKET' || orderInfo.type === 'STOP') {
-                        stopLossPrice = parseFloat(orderInfo.stopPrice);
+                // 处理 symbol 格式：ETH/USDT:USDT -> ETHUSDT
+                const symbolKey = p.symbol.replace('/', '').replace(':USDT', '');
+                const algoOrders = algoOrdersBySymbol.get(symbolKey) || [];
+                
+                if (algoOrders.length > 0) {
+                  for (const order of algoOrders) {
+                    // 币安返回的字段：orderType 是订单类型，positionSide 是方向
+                    if (order.positionSide === side) {
+                      if (order.orderType === 'TAKE_PROFIT_MARKET') {
+                        takeProfitPrice = parseFloat(order.triggerPrice || order.stopPrice);
+                      } else if (order.orderType === 'STOP_MARKET') {
+                        stopLossPrice = parseFloat(order.triggerPrice || order.stopPrice);
                       }
                     }
                   }
-                } catch (error) {
-                  console.warn(`Failed to fetch open orders for ${p.symbol}:`, error);
                 }
                 
                 return {

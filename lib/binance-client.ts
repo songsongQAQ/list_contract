@@ -25,6 +25,7 @@ export const getBinanceClient = async (apiKey?: string, apiSecret?: string, requ
       console.log('Creating public CCXT client (no authentication)');
       publicClient = new ccxt.binance({
         enableRateLimit: true,
+        sandbox: false,  // 确保使用生产环境
         options: {
           defaultType: 'future',
         },
@@ -46,6 +47,7 @@ export const getBinanceClient = async (apiKey?: string, apiSecret?: string, requ
     apiKey: trimmedKey,
     secret: trimmedSecret,  // ccxt 使用 'secret' 属性名
     enableRateLimit: true,
+    sandbox: false,  // 确保使用生产环境
     options: {
       defaultType: 'future',
       recvWindow: 60000,

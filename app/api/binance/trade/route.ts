@@ -156,8 +156,8 @@ export async function POST(request: NextRequest) {
               console.log(`Successfully set leverage to ${tryLev}x for ${symbol}`);
               leverageSet = true;
               break;
-            } catch (_tryError) {
-              console.log(`Leverage ${tryLev}x failed for ${symbol}, trying next...`);
+            } catch (tryError: any) {
+              console.log(`Leverage ${tryLev}x failed for ${symbol}, trying next...`, tryError.message);
               continue;
             }
           }
@@ -285,16 +285,19 @@ export async function POST(request: NextRequest) {
 
             console.log(`📊 计算出的TP/SL价格: tpPrice=${tpPrice?.toFixed(4)}, slPrice=${slPrice?.toFixed(4)}, side=${side}, entry=${price.toFixed(4)}, 实际本金=${actualMargin.toFixed(2)}U`);
 
-            // Place Take Profit order if configured
+            // Place Take Profit order if configured (Algo Order)
             if (tpPrice) {
               const tpSide = side === 'LONG' ? 'sell' : 'buy';
               try {
                 console.log(`正在设置TP订单: ${symbol} ${tpSide} ${quantity} @ ${tpPrice.toFixed(4)}`);
-                await client.createOrder(symbol, 'TAKE_PROFIT_MARKET', tpSide, quantity, undefined, {
+                // 币安 v4.5.26+ 会自动调用 Algo Order API
+                const tpParams = {
                   positionSide: side,
                   stopPrice: tpPrice,
-                  closePosition: 'true'
-                });
+                  closePosition: true,
+                  type: 'TAKE_PROFIT_MARKET'
+                };
+                await client.createOrder(symbol, 'TAKE_PROFIT_MARKET', tpSide, quantity, undefined, tpParams);
                 console.log(`✓ TP order set for ${symbol}: trigger=${tpPrice.toFixed(4)}`);
               } catch (tpError: any) {
                 console.warn(`✗ Failed to set TP for ${symbol}:`, tpError.message);
@@ -303,16 +306,19 @@ export async function POST(request: NextRequest) {
               console.log(`⏭️ 跳过TP订单设置 (takeProfitValid=${takeProfitValid})`);
             }
 
-            // Place Stop Loss order if configured
+            // Place Stop Loss order if configured (Algo Order)
             if (slPrice) {
               const slSide = side === 'LONG' ? 'sell' : 'buy';
               try {
                 console.log(`正在设置SL订单: ${symbol} ${slSide} ${quantity} @ ${slPrice.toFixed(4)}`);
-                await client.createOrder(symbol, 'STOP_MARKET', slSide, quantity, undefined, {
+                // 币安 v4.5.26+ 会自动调用 Algo Order API
+                const slParams = {
                   positionSide: side,
                   stopPrice: slPrice,
-                  closePosition: 'true'
-                });
+                  closePosition: true,
+                  type: 'STOP_MARKET'
+                };
+                await client.createOrder(symbol, 'STOP_MARKET', slSide, quantity, undefined, slParams);
                 console.log(`✓ SL order set for ${symbol}: trigger=${slPrice.toFixed(4)}`);
               } catch (slError: any) {
                 console.warn(`✗ Failed to set SL for ${symbol}:`, slError.message);
@@ -369,8 +375,8 @@ export async function POST(request: NextRequest) {
                   retryQuantity = parseFloat(retryQuantity.toPrecision(amountAny.precision));
                 }
               }
-            } catch (_e) {
-              console.warn(`Could not fetch market limits for retry ${symbol}`);
+            } catch (limitError) {
+              console.warn(`Could not fetch market limits for retry ${symbol}:`, limitError);
             }
             
             const retryOrderSide = side === 'LONG' ? 'buy' : 'sell';
