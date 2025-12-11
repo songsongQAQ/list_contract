@@ -92,8 +92,9 @@ export async function POST(request: NextRequest) {
     const client = await getBinanceClient(apiKey, apiSecret, true);
     const results = [];
     
-    // 0. Fetch account balance to determine available margin
-    let accountBalance = 10000; // Default fallback
+    // 0. Fetch account balance once at the beginning
+    // 这个仅用于安全检查，不用于计算每个币种的仓位值
+    let initialAccountBalance = 10000; // Default fallback
     try {
       const balance = await client.fetchBalance();
       const balanceAny = balance as any;
@@ -110,14 +111,24 @@ export async function POST(request: NextRequest) {
       
       // Convert to number if string
       if (typeof usdtBalance === 'string') {
-        accountBalance = parseFloat(usdtBalance) || 10000;
+        initialAccountBalance = parseFloat(usdtBalance) || 10000;
       } else if (typeof usdtBalance === 'number') {
-        accountBalance = usdtBalance || 10000;
+        initialAccountBalance = usdtBalance || 10000;
       } else {
-        accountBalance = 10000;
+        initialAccountBalance = 10000;
       }
       
-      console.log(`Account balance: ${accountBalance} USDT`);
+      // #region agent log - debug: log account balance
+      const debugLog = {
+        location: 'trade/route.ts:121',
+        message: 'Initial account balance fetched',
+        data: { initialAccountBalance, margin, leverage, notional, symbolsCount: symbols.length },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        hypothesisId: 'H1-balance-limiting'
+      };
+      console.log(`Initial account balance: ${initialAccountBalance} USDT, will open ${symbols.length} positions`);
+      // #endregion
     } catch (e) {
       console.warn('Could not fetch balance, using default', e);
     }
@@ -176,13 +187,51 @@ export async function POST(request: NextRequest) {
         const price = ticker.last;
         if (!price) throw new Error('Could not fetch price');
 
-        // 使用用户配置的仓位价值
-        // 注：Binance 会自动检查最小仓位，如果不满足会返回错误
+        // 使用用户配置的仓位价值 - 每个币种价值完全统一
+        // 每个币种都应该有相同的仓位价值，不受其他币种影响
         const baseNotional = notional;
         
-        // But don't exceed 50% of account balance for safety
-        const maxAllowed = accountBalance * 0.5;
-        const targetNotional = Math.min(baseNotional, maxAllowed);
+        // #region agent log - debug: check notional assignment
+        const debugNotionalLog = {
+          location: 'trade/route.ts:186',
+          message: 'Notional value assignment',
+          data: { 
+            configuredNotional: notional,
+            baseNotional: baseNotional,
+            initialAccountBalance: initialAccountBalance,
+            symbol: symbol,
+            symbolIndex: symbols.indexOf(symbol) + 1,
+            totalSymbols: symbols.length
+          },
+          timestamp: Date.now(),
+          sessionId: 'debug-session',
+          hypothesisId: 'H2-notional-consistency'
+        };
+        console.log(`DEBUG: ${symbol} (#${symbols.indexOf(symbol) + 1}/${symbols.length}) using notional=${baseNotional}U (configured), initial_account=${initialAccountBalance}U`);
+        // #endregion
+        
+        // 只有当单个仓位超过初始账户余额的50%时才降低（极端情况保护）
+        // 但通常不应该触发这个限制，因为您已经规划了仓位
+        const maxAllowed = initialAccountBalance * 0.5;
+        const targetNotional = baseNotional > maxAllowed ? maxAllowed : baseNotional;
+        
+        // #region agent log - debug: validate target notional
+        const debugTargetLog = {
+          location: 'trade/route.ts:202',
+          message: 'Target notional after validation',
+          data: { 
+            targetNotional: targetNotional,
+            baseNotional: baseNotional,
+            maxAllowed: maxAllowed,
+            shouldLimitByBalance: baseNotional > maxAllowed,
+            symbol: symbol
+          },
+          timestamp: Date.now(),
+          sessionId: 'debug-session',
+          hypothesisId: 'H2-notional-consistency'
+        };
+        console.log(`DEBUG: ${symbol} targetNotional=${targetNotional}U (base=${baseNotional}U, max=${maxAllowed}U)`);
+        // #endregion
         
         let quantity = targetNotional / price;
         
@@ -235,16 +284,40 @@ export async function POST(request: NextRequest) {
 
         // 4. Place Order with correct positionSide
         const orderSide = side === 'LONG' ? 'buy' : 'sell';
-        console.log(`Placing ${side} order: ${symbol} qty=${quantity} price=${price} total~${(quantity * price).toFixed(2)}USDT`);
+        
+        // ⚠️ 计算实际开仓价值（可能因为最小仓位要求而大于配置值）
+        const actualNotional = quantity * price;
+        
+        // #region agent log - debug: track actual notional
+        const debugActualNotionalLog = {
+          location: 'trade/route.ts:282',
+          message: 'Actual notional value before placing order',
+          data: { 
+            symbol: symbol,
+            configuredNotional: notional,
+            targetNotional: targetNotional,
+            actualNotional: actualNotional.toFixed(2),
+            quantity: quantity,
+            price: price,
+            matchesConfigured: Math.abs(actualNotional - notional) < 1
+          },
+          timestamp: Date.now(),
+          sessionId: 'debug-session',
+          hypothesisId: 'H3-actual-notional-drift'
+        };
+        console.log(`DEBUG: ${symbol} ORDER CHECK - configured=${notional}U, actual=${actualNotional.toFixed(2)}U, qty=${quantity}, price=${price}`);
+        // #endregion
+        
+        console.log(`Placing ${side} order: ${symbol} qty=${quantity} price=${price} configured=${notional}U, actual=${actualNotional.toFixed(2)}U`);
         
         const order = await client.createMarketOrder(symbol, orderSide, quantity, undefined, { 
           positionSide: side  // IMPORTANT: Specify LONG or SHORT for Binance futures
         });
 
         // 5. Set Take Profit and Stop Loss if configured
-        // ⚠️ 根据实际杠杆计算实际本金（因为实际杠杆可能小于配置的杠杆）
-        const actualMargin = notional / actualLeverage;  // 实际本金 = 仓位价值 / 实际杠杆
-        console.log(`📊 准备设置止盈止损: takeProfit=${takeProfitValid}%, stopLoss=${stopLossValid}%, 配置本金=${margin}U, 实际本金=${actualMargin.toFixed(2)}U, 实际杠杆=${actualLeverage}x, quantity=${quantity}`);
+        // ⚠️ 使用实际开仓价值计算实际本金（而不是配置值），确保止损基于实际仓位
+        const actualMargin = actualNotional / actualLeverage;  // 实际本金 = 实际仓位价值 / 实际杠杆
+        console.log(`📊 准备设置止盈止损: takeProfit=${takeProfitValid}%, stopLoss=${stopLossValid}%, 配置本金=${margin}U, 实际仓位=${actualNotional.toFixed(2)}U, 实际本金=${actualMargin.toFixed(2)}U, 实际杠杆=${actualLeverage}x`);
         
         if (takeProfitValid > 0 || stopLossValid > 0) {
           try {
@@ -351,8 +424,12 @@ export async function POST(request: NextRequest) {
             const coinSymbol = symbol.split('/')[0];
             const defaultMinNotional = coinSymbol === 'BTC' ? 200 : 100;
             const retryBaseNotional = Math.max(notional + 50, defaultMinNotional); // 增加 50U
-            const maxAllowed = accountBalance * 0.5;
+            const maxAllowed = initialAccountBalance * 0.5;
             const retryTargetNotional = Math.min(retryBaseNotional, maxAllowed);
+            
+            // #region agent log - debug: retry notional
+            console.log(`DEBUG: ${symbol} RETRY with increased notional: base=${retryBaseNotional}U, target=${retryTargetNotional}U, maxAllowed=${maxAllowed}U`);
+            // #endregion
             let retryQuantity = retryTargetNotional / retryPrice;
             
             console.log(`Retry with increased notional: ${retryTargetNotional} USDT`);
